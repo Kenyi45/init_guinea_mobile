@@ -27,7 +27,7 @@ class RabbitMQBroker(MessageBroker):
     """RabbitMQ implementation of message broker."""
     
     def __init__(self):
-        self.connection_url = os.getenv("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")
+        self.connection_url = os.getenv("RABBITMQ_URL")
         self.connection = None
         self.channel = None
         self._connect()

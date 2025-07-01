@@ -13,9 +13,9 @@ class AuthService:
     def __init__(self, user_repository: UserRepository, password_service: PasswordService):
         self.user_repository = user_repository
         self.password_service = password_service
-        self.secret_key = os.getenv("SECRET_KEY", "your-secret-key-here")
+        self.secret_key = os.getenv("SECRET_KEY")
         self.algorithm = os.getenv("ALGORITHM", "HS256")
-        self.access_token_expire_minutes = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
+        self.access_token_expire_minutes = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
     
     async def authenticate_user(self, email: str, password: str) -> dict:
         """Authenticate a user with email and password."""

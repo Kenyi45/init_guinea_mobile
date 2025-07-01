@@ -1,17 +1,27 @@
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker, Session, declarative_base
 from sqlalchemy.pool import StaticPool
 from typing import Generator
 import os
+from dotenv import load_dotenv
 
+# Load environment variables
+load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:admin@localhost:5433/hexagonal_db")
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+# Configure engine based on database type
+if DATABASE_URL and "sqlite" in DATABASE_URL:
+    connect_args = {"check_same_thread": False}
+    poolclass = StaticPool
+else:
+    connect_args = {}
+    poolclass = None
 
 engine = create_engine(
     DATABASE_URL,
-    poolclass=StaticPool,
-    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {},
+    poolclass=poolclass,
+    connect_args=connect_args,
     echo=os.getenv("DEBUG", "False").lower() == "true"
 )
 

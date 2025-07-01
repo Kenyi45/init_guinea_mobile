@@ -6,7 +6,7 @@ from typing import Generator
 import os
 
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:password@localhost:5432/hexagonal_db")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:admin@localhost:5433/hexagonal_db")
 
 engine = create_engine(
     DATABASE_URL,

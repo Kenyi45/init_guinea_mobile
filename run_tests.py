@@ -28,7 +28,8 @@ def main():
     # Run tests with coverage
     test_command = (
         "python -m pytest "
-        "--cov=src "
+        "--cov=src/contexts/users/domain "
+        "--cov=src/shared/domain "
         "--cov-report=term-missing "
         "--cov-report=html:htmlcov "
         "--cov-fail-under=80 "

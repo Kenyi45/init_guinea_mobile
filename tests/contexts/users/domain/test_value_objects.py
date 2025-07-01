@@ -1,6 +1,44 @@
 import pytest
 from src.contexts.users.domain.value_objects import Email, Username, FullName, HashedPassword
 from src.shared.domain.exceptions import ValidationError
+from src.shared.domain.base_value_object import BaseValueObject
+
+
+class TestValueObject(BaseValueObject):
+    """Test implementation of BaseValueObject for testing purposes."""
+    def __init__(self, name: str, value: int):
+        self.name = name
+        self.value = value
+
+
+class TestBaseValueObject:
+    """Test cases for BaseValueObject functionality."""
+    
+    def test_equality_with_same_type_and_values(self):
+        """Test equality when objects are of same type with same values."""
+        obj1 = TestValueObject("test", 42)
+        obj2 = TestValueObject("test", 42)
+        assert obj1 == obj2
+    
+    def test_equality_with_different_type(self):
+        """Test equality returns False when comparing with different type."""
+        obj1 = TestValueObject("test", 42)
+        obj2 = "not a value object"
+        assert obj1 != obj2
+    
+    def test_hash_consistency(self):
+        """Test that hash is consistent for equal objects."""
+        obj1 = TestValueObject("test", 42)
+        obj2 = TestValueObject("test", 42)
+        assert hash(obj1) == hash(obj2)
+    
+    def test_repr_method(self):
+        """Test string representation of value object."""
+        obj = TestValueObject("test", 42)
+        repr_str = repr(obj)
+        assert "TestValueObject" in repr_str
+        assert "name='test'" in repr_str
+        assert "value=42" in repr_str
 
 
 class TestEmail:

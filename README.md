@@ -145,7 +145,3 @@ curl -X POST "http://localhost:8000/api/v1/auth/login" \
 - **app**: FastAPI application (port 8000)
 - **db**: PostgreSQL database (port 5432)
 - **rabbitmq**: Message broker (port 5672, management UI 15672)
-
----
-
-**Built with ❤️ using Hexagonal Architecture, CQRS, and SOLID principles** 

@@ -1,6 +1,6 @@
 from abc import ABC
 from typing import Any, Dict, List
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 
 
@@ -10,7 +10,7 @@ class DomainEvent:
     def __init__(self, event_type: str, data: Dict[str, Any]):
         self.event_type = event_type
         self.data = data
-        self.occurred_at = datetime.utcnow()
+        self.occurred_at = datetime.now(timezone.utc)
         self.event_id = str(uuid.uuid4())
 
 
@@ -20,8 +20,8 @@ class BaseEntity(ABC):
     def __init__(self, entity_id: str = None):
         self._id = entity_id or str(uuid.uuid4())
         self._domain_events: List[DomainEvent] = []
-        self._created_at = datetime.utcnow()
-        self._updated_at = datetime.utcnow()
+        self._created_at = datetime.now(timezone.utc)
+        self._updated_at = datetime.now(timezone.utc)
     
     @property
     def id(self) -> str:
@@ -37,7 +37,7 @@ class BaseEntity(ABC):
     
     def mark_updated(self) -> None:
         """Mark entity as updated."""
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
     
     def add_domain_event(self, event: DomainEvent) -> None:
         """Add a domain event to be published."""

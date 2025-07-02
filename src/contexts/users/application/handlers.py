@@ -7,7 +7,7 @@ from src.contexts.users.domain.entities import User
 from src.contexts.users.domain.repositories import UserRepository
 from src.contexts.users.domain.services import PasswordService
 from src.contexts.users.application.commands import (
-    CreateUserCommand, UpdateUserCommand, DeactivateUserCommand, ActivateUserCommand
+    CreateUserCommand, UpdateUserCommand, DeactivateUserCommand, ActivateUserCommand, DeleteUserCommand
 )
 from src.contexts.users.application.queries import (
     GetUserByIdQuery, GetUserByEmailQuery, GetUserByUsernameQuery, GetUsersQuery
@@ -132,4 +132,31 @@ class GetUsersQueryHandler(QueryHandler[GetUsersQuery, UserListDto]):
             total=len(user_dtos),
             limit=query.limit,
             offset=query.offset
-        ) 
+        )
+
+
+class DeleteUserCommandHandler(CommandHandler[DeleteUserCommand]):
+    """Handler for deleting/deactivating a user."""
+    
+    def __init__(self, user_repository: UserRepository, event_bus: EventBus):
+        self.user_repository = user_repository
+        self.event_bus = event_bus
+    
+    async def handle(self, command: DeleteUserCommand) -> bool:
+        """Handle the delete user command."""
+        user = await self.user_repository.find_by_id(command.user_id)
+        if not user:
+            raise NotFoundError(f"User with ID {command.user_id} not found")
+        
+        # Deactivate user instead of hard delete
+        user.deactivate()
+        
+        await self.user_repository.save(user)
+        
+        # Publish domain events
+        events = user.get_domain_events()
+        if events:
+            await self.event_bus.publish(events)
+            user.clear_domain_events()
+        
+        return True 

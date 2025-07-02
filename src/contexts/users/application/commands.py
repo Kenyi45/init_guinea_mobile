@@ -29,4 +29,10 @@ class DeactivateUserCommand(Command):
 class ActivateUserCommand(Command):
     """Command to activate a user."""
     
+    user_id: str
+
+
+class DeleteUserCommand(Command):
+    """Command to delete/deactivate a user."""
+    
     user_id: str 

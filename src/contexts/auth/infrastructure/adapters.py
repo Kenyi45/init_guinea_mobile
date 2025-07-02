@@ -51,4 +51,21 @@ async def verify_token(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(e),
             headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+@router.post("/refresh", response_model=TokenDto)
+async def refresh_token(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    auth_service: AuthService = Depends(get_auth_service)
+):
+    """Refresh JWT token."""
+    try:
+        result = auth_service.refresh_access_token(credentials.credentials)
+        return TokenDto(**result)
+    except UnauthorizedError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e),
+            headers={"WWW-Authenticate": "Bearer"},
         ) 

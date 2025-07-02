@@ -189,6 +189,8 @@ DEBUG=true
 | `GET` | `/docs` | Documentación Swagger |
 | `GET` | `/redoc` | Documentación ReDoc |
 
+> **📝 Nota importante**: Actualmente todos los endpoints de usuarios son **públicos** (no requieren autenticación). La implementación de middleware de autenticación JWT está planificada para futuras versiones.
+
 ---
 
 ## 🧪 Testing
@@ -242,16 +244,17 @@ def sample_user_data():
 ### **✅ Funcionalidades Implementadas**
 
 - **👤 Gestión de Usuarios**
-  - ✅ CRUD completo con validaciones de dominio
+  - ✅ CRUD completo con validaciones de dominio (Create, Read, Update, Delete)
   - ✅ Value objects para email, username, nombres
-  - ✅ Eventos de dominio (UserCreated, UserUpdated)
-  - ✅ Activación/desactivación de cuentas
+  - ✅ Eventos de dominio (UserCreated, UserUpdated, UserDeleted)
+  - ✅ Autenticación JWT en endpoints protegidos
+  - ✅ Desactivación suave de usuarios (soft delete)
 
-- **🔐 Autenticación Segura**
+- **🔐 Autenticación Completa**
   - ✅ JWT con expiración configurable
   - ✅ Hashing de contraseñas con bcrypt + salt
-  - ✅ Middleware de autenticación
-  - ✅ Validación de tokens
+  - ✅ Login, verificación y renovación de tokens
+  - ✅ Middleware de autenticación para endpoints protegidos
 
 - **🏗️ Arquitectura Moderna**
   - ✅ Arquitectura Hexagonal completa
@@ -278,6 +281,11 @@ def sample_user_data():
   - 🔜 Verificación de email
   - 🔜 Reset de contraseñas
   - 🔜 Perfil de usuario extendido
+
+- **🔐 Authentication**
+  - 🔜 Rate limiting en endpoints de login
+  - 🔜 Logout con blacklist de tokens
+  - 🔜 Autenticación multi-factor (2FA)
 
 - **📊 Observabilidad**
   - 🔜 Métricas con Prometheus
@@ -343,11 +351,47 @@ curl -X POST "http://localhost:8000/api/v1/auth/login" \
 }
 ```
 
-### **📊 Consultar Usuarios (Autenticado)**
+### **📊 Consultar Usuarios (Requiere JWT)**
 
 ```bash
+# Listar todos los usuarios (endpoint protegido)
 curl -X GET "http://localhost:8000/api/v1/users" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+# Obtener usuario específico por ID
+curl -X GET "http://localhost:8000/api/v1/users/{user-id}" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+# Actualizar usuario
+curl -X PUT "http://localhost:8000/api/v1/users/{user-id}" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  -d '{
+    "first_name": "Juan Carlos",
+    "last_name": "Pérez García"
+  }'
+
+# Eliminar usuario (desactivación suave)
+curl -X DELETE "http://localhost:8000/api/v1/users/{user-id}" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+### **🔄 Renovar Token**
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/auth/refresh" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+**Respuesta:**
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer",
+  "user_id": "uuid-here",
+  "email": "juan.perez@example.com",
+  "expires_at": "2024-01-15T12:30:00Z"
+}
 ```
 
 ---

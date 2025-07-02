@@ -51,6 +51,29 @@ class AuthService:
         except JWTError:
             raise UnauthorizedError("Invalid token")
     
+    def refresh_access_token(self, token: str) -> dict:
+        """Refresh an access token."""
+        try:
+            payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
+            user_id: str = payload.get("sub")
+            email: str = payload.get("email")
+            
+            if user_id is None or email is None:
+                raise UnauthorizedError("Invalid token")
+            
+            # Create new access token
+            new_access_token = self._create_access_token({"sub": user_id, "email": email})
+            
+            return {
+                "access_token": new_access_token,
+                "token_type": "bearer",
+                "user_id": user_id,
+                "email": email,
+                "expires_at": datetime.utcnow() + timedelta(minutes=self.access_token_expire_minutes)
+            }
+        except JWTError:
+            raise UnauthorizedError("Invalid or expired token")
+
     def _create_access_token(self, data: dict, expires_delta: Optional[timedelta] = None):
         """Create JWT access token."""
         to_encode = data.copy()

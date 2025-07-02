@@ -87,8 +87,7 @@
 
 ```bash
 # Clonar el repositorio
-git clone <repository-url>
-cd hexagonal-architecture-api
+git clone https://github.com/Kenyi45/init_guinea_mobile.git
 
 # Construir y ejecutar todos los servicios
 docker-compose up --build

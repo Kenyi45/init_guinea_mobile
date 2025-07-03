@@ -31,11 +31,8 @@ def get_password_service() -> PasswordService:
 
 def get_event_bus() -> EventBus:
     """Get event bus instance."""
-    # This should be implemented properly with RabbitMQ
-    class DummyEventBus(EventBus):
-        async def publish(self, events):
-            pass
-    return DummyEventBus()
+    from src.shared.infrastructure.event_bus_impl import RabbitMQEventBus
+    return RabbitMQEventBus()
 
 
 @router.post("/", response_model=UserDto, status_code=status.HTTP_201_CREATED)

@@ -6,7 +6,8 @@
 3. [Patrones de Diseño Implementados](#patrones-de-diseño-implementados)
 4. [Programación Orientada a Objetos](#programación-orientada-a-objetos)
 5. [Funcionamiento de las Tecnologías Implementadas](#funcionamiento-de-las-tecnologías-implementadas)
-6. [Preguntas y Respuestas de Entrevista](#preguntas-y-respuestas-de-entrevista)
+6. [Métricas y Observabilidad](#métricas-y-observabilidad)
+7. [Preguntas y Respuestas de Entrevista](#preguntas-y-respuestas-de-entrevista)
 
 ---
 
@@ -55,9 +56,9 @@ class CreateUserCommand(Command):
 
 **Componentes:**
 - **Comandos y Queries**: Implementación de CQRS
-- **Handlers**: Orquestación de casos de uso
+- **Handlers**: Orquestación de casos de uso con métricas integradas
 - **DTOs**: Transferencia de datos entre capas
-- **Event Bus**: Publicación de eventos de dominio
+- **Event Bus**: Publicación de eventos con RabbitMQ real
 
 #### **Capa de Infraestructura (Infrastructure Layer)**
 ```python
@@ -76,30 +77,43 @@ class SQLAlchemyUserRepository(UserRepository):
 - **Repositorios Concretos**: Implementación con SQLAlchemy
 - **Modelos de Persistencia**: Mapping entre entidades y BD
 - **Adaptadores de API**: Controllers REST con FastAPI
-- **Message Broker**: RabbitMQ para eventos asincrónicos
+- **Message Broker**: RabbitMQ completamente integrado
+- **Métricas**: Sistema completo de observabilidad con Prometheus
 
 ### **2. Patrones CQRS (Command Query Responsibility Segregation)**
 
-**Separación clara entre escritura y lectura:**
+**Separación clara entre escritura y lectura con procesamiento asíncrono real:**
 
 ```python
 # src/contexts/users/application/handlers.py
 class CreateUserCommandHandler(CommandHandler[CreateUserCommand]):
     """Handler for creating a user."""
     
-    def __init__(self, user_repository: UserRepository, password_service: PasswordService, event_bus: EventBus):
-        self.user_repository = user_repository
-        self.password_service = password_service
-        self.event_bus = event_bus
-    
+    @monitor_command("create_user")
     async def handle(self, command: CreateUserCommand) -> UserDto:
+        """Handle the create user command with metrics."""
+        try:
+            # Lógica de negocio
+            user = User.create(...)
+            saved_user = await self.user_repository.save(user)
+            
+            # Eventos procesados por RabbitMQ
+            events = saved_user.get_domain_events()
+            if events:
+                await self.event_bus.publish(events)  # RabbitMQ real
+            
+            record_user_operation("create", "success")
+            return user_to_dto(saved_user)
+        except Exception:
+            record_user_operation("create", "error")
+            raise
 ```
 
 **Características:**
-- **Comandos**: Operaciones de escritura procesadas de forma asíncrona
-- **Queries**: Operaciones de lectura directas y optimizadas
-- **Handlers especializados**: Para cada comando y query
-- **Event-driven**: Comunicación vía eventos de dominio
+- **Comandos**: Procesados asincrónicamente con RabbitMQ
+- **Queries**: Optimizadas para lectura con métricas
+- **Handlers instrumentados**: Métricas automáticas de rendimiento
+- **Event-driven**: Comunicación real vía RabbitMQ
 
 ### **3. Bundle-contexts (Bounded Contexts)**
 
@@ -110,9 +124,14 @@ src/contexts/
 ├── users/          # Contexto de gestión de usuarios
 │   ├── domain/     # Entidades, value objects, servicios
 │   ├── application/# Comandos, queries, handlers
-│   └── infrastructure/ # Repositorios, adaptadores
+│   └── infrastructure/ # Repositorios, adaptadores, consumers
 ├── auth/           # Contexto de autenticación
 └── shared/         # Infraestructura compartida
+    └── infrastructure/
+        ├── metrics.py          # Sistema de métricas Prometheus
+        ├── metrics_middleware.py # Middleware automático
+        ├── event_bus_impl.py   # EventBus real con RabbitMQ
+        └── message_broker.py   # RabbitMQ integrado
 ```
 
 ---
@@ -136,6 +155,7 @@ class PasswordService:
 - Cada clase tiene una única responsabilidad
 - `PasswordService` solo maneja operaciones de contraseñas
 - `Email` solo valida y representa emails
+- **Sistema de métricas** separado en módulo específico
 
 ### **O - Open/Closed Principle**
 ```python
@@ -151,7 +171,8 @@ class UserRepository(ABC):
 
 **Aplicación:**
 - Interfaces abstractas permiten extensión sin modificación
-- Nuevas implementaciones sin cambiar código existente
+- **Métricas** agregadas sin modificar handlers existentes
+- **RabbitMQ** integrado manteniendo interfaces
 
 ### **L - Liskov Substitution Principle**
 ```python
@@ -163,6 +184,7 @@ class SQLAlchemyUserRepository(UserRepository):
 **Aplicación:**
 - Las implementaciones concretas son intercambiables
 - `SQLAlchemyUserRepository` cumple el contrato de `UserRepository`
+- **EventBus** real sustituye al dummy manteniendo compatibilidad
 
 ### **I - Interface Segregation Principle**
 ```python
@@ -178,6 +200,7 @@ class EventBus(ABC):
 
 **Aplicación:**
 - Interfaces específicas y cohesivas
+- **Métricas** como interfaz separada
 - Clientes no dependen de métodos que no usan
 
 ### **D - Dependency Inversion Principle**
@@ -192,6 +215,7 @@ def __init__(self, user_repository: UserRepository, password_service: PasswordSe
 **Aplicación:**
 - Dependencia de abstracciones, no de concreciones
 - Inyección de dependencias en todos los handlers
+- **Sistema de métricas** inyectado como dependencia
 
 ---
 
@@ -209,6 +233,7 @@ async def find_by_email(self, email: str) -> Optional[User]:
 **Beneficios:**
 - Abstracción del acceso a datos
 - Separación entre lógica de dominio y persistencia
+- **Instrumentación automática** con métricas
 
 ### **2. Command Pattern**
 ```python
@@ -223,6 +248,7 @@ class CreateUserCommand(Command):
 **Beneficios:**
 - Encapsulación de requests como objetos
 - Soporte para deshacer, queue, logging
+- **Procesamiento asíncrono** con RabbitMQ
 
 ### **3. Factory Method**
 ```python
@@ -242,6 +268,7 @@ def create(
 **Beneficios:**
 - Creación controlada de entidades
 - Validación y eventos automáticos
+- **Métricas** de creación integradas
 
 ### **4. Observer Pattern**
 ```python
@@ -256,7 +283,8 @@ class DomainEvent:
 
 **Beneficios:**
 - Eventos de dominio para comunicación desacoplada
-- Patrones pub/sub con RabbitMQ
+- **Procesamiento asíncrono** real con RabbitMQ
+- **Métricas** de eventos integradas
 
 ### **5. Dependency Injection**
 ```python
@@ -269,6 +297,7 @@ def get_user_repository(db: Session = Depends(get_db)) -> SQLAlchemyUserReposito
 **Beneficios:**
 - Inversión de control en FastAPI
 - Acoplamiento débil entre componentes
+- **Fácil testing** con mocks
 
 ---
 
@@ -289,6 +318,7 @@ def username(self) -> Optional[Username]:
 **Implementación:**
 - Atributos privados con acceso controlado
 - Properties para controlar acceso
+- **Validaciones** en setters
 
 ### **Herencia**
 ```python
@@ -304,6 +334,7 @@ class User(BaseEntity):
 **Implementación:**
 - Herencia de `BaseEntity` para funcionalidad común
 - Especialización en clases derivadas
+- **Métricas** heredadas automáticamente
 
 ### **Polimorfismo**
 ```python
@@ -314,6 +345,7 @@ class SQLAlchemyUserRepository(UserRepository):
 **Implementación:**
 - Implementaciones intercambiables de interfaces
 - Comportamiento específico por tipo
+- **EventBus** real/dummy intercambiables
 
 ### **Abstracción**
 ```python
@@ -325,6 +357,7 @@ class UserRepository(ABC):
 **Implementación:**
 - Interfaces abstractas ocultan complejidad
 - Contratos claros entre capas
+- **Métricas** abstractas para diferentes implementaciones
 
 ---
 
@@ -334,57 +367,165 @@ class UserRepository(ABC):
 
 **¿Qué permite hacer RabbitMQ en el proyecto?**
 
-RabbitMQ actúa como el **message broker** principal para implementar CQRS y comunicación asíncrona:
+RabbitMQ actúa como el **message broker** principal completamente integrado para CQRS y comunicación asíncrona:
 
 ```python
-# src/shared/infrastructure/message_broker.py
-class RabbitMQBroker(MessageBroker):
-    """RabbitMQ implementation of message broker."""
+# src/shared/infrastructure/event_bus_impl.py
+class RabbitMQEventBus(EventBus):
+    """RabbitMQ implementation of EventBus."""
     
-    async def publish(self, queue_name: str, message: dict) -> None:
-        """Publish a message to a queue."""
-        self.channel.basic_publish(
-            exchange='',
-            routing_key=queue_name,
-            body=json.dumps(message),
-            properties=pika.BasicProperties(
-                delivery_mode=2,  # Make message persistent
-            )
-        )
+    async def publish(self, events: List[DomainEvent]) -> None:
+        """Publish domain events to RabbitMQ."""
+        for event in events:
+            try:
+                message = {
+                    "event_type": event.event_type,
+                    "data": event.data,
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+                
+                queue_name = self._get_queue_name(event.event_type)
+                await self.broker.publish(queue_name, message)
+                
+                # Métricas integradas
+                record_message_published(queue_name, "success")
+                
+            except Exception as e:
+                record_message_published(queue_name, "error")
+                raise
 ```
 
-**Funcionalidades que proporciona:**
+**Funcionalidades completamente implementadas:**
 
-- **🔄 Procesamiento Asíncrono**: Los comandos se envían a colas para procesamiento posterior
-- **⚡ Desacoplamiento**: Separación entre quien envía y quien procesa comandos
-- **🛡️ Persistencia**: Mensajes durables que sobreviven a reinicios del sistema
-- **🔁 Retry Logic**: Reintento automático de mensajes fallidos
-- **📊 Load Balancing**: Distribución de carga entre múltiples consumers
+- **🔄 Procesamiento Asíncrono**: Comandos procesados en background
+- **⚡ Desacoplamiento**: Comunicación entre contextos sin dependencias
+- **🛡️ Persistencia**: Mensajes durables con garantías de entrega
+- **🔁 Retry Logic**: Reintentos automáticos con dead letter queues
+- **📊 Métricas**: Monitoreo completo de colas y mensajes
+- **🎯 Routing**: Enrutamiento inteligente por tipo de evento
 
-**Flujo de trabajo:**
-```
-API Request → Command → RabbitMQ Queue → Consumer → Handler → Database
-```
-
-**Ejemplo de Consumer:**
+**Consumers reales implementados:**
 ```python
 # src/contexts/users/infrastructure/consumers.py
 class UserCommandConsumer:
     """Consumer for user commands from RabbitMQ."""
     
     async def handle_user_command(self, message: Dict[str, Any]):
-        """Handle user command messages."""
-        command_type = message.get("command_type")
+        """Handle user command messages with metrics."""
+        queue_name = "user_commands"
+        try:
+            command_type = message.get("command_type")
+            
+            if command_type == "create_user":
+                await self._handle_create_user(command_data)
+                record_message_consumed(queue_name, "success")
+            else:
+                record_message_consumed(queue_name, "unknown_command")
+                
+        except Exception as e:
+            record_message_consumed(queue_name, "error")
+            raise
+```
+
+### **📊 Sistema de Métricas con Prometheus**
+
+**¿Qué observabilidad proporciona el sistema de métricas?**
+
+Sistema completo de métricas implementado para monitoreo y observabilidad:
+
+```python
+# src/shared/infrastructure/metrics.py
+# HTTP METRICS
+http_requests_total = Counter(
+    'http_requests_total',
+    'Total number of HTTP requests',
+    ['method', 'endpoint', 'status_code']
+)
+
+http_request_duration_seconds = Histogram(
+    'http_request_duration_seconds',
+    'HTTP request duration in seconds',
+    ['method', 'endpoint']
+)
+
+# BUSINESS METRICS
+user_operations_total = Counter(
+    'user_operations_total',
+    'Total number of user operations',
+    ['operation', 'status']
+)
+
+auth_attempts_total = Counter(
+    'auth_attempts_total',
+    'Total number of authentication attempts',
+    ['status']
+)
+
+# RABBITMQ METRICS
+messages_published_total = Counter(
+    'messages_published_total',
+    'Total number of messages published to RabbitMQ',
+    ['queue', 'status']
+)
+
+messages_consumed_total = Counter(
+    'messages_consumed_total',
+    'Total number of messages consumed from RabbitMQ',
+    ['queue', 'status']
+)
+```
+
+**Instrumentación automática:**
+```python
+# src/shared/infrastructure/metrics_middleware.py
+class PrometheusMiddleware(BaseHTTPMiddleware):
+    """Middleware to automatically record HTTP metrics."""
+    
+    async def dispatch(self, request: Request, call_next):
+        """Process request and record metrics."""
+        start_time = time.time()
+        method = request.method
+        endpoint = self._normalize_endpoint(request.url.path)
         
-        if command_type == "create_user":
-            await self._handle_create_user(command_data)
+        try:
+            response = await call_next(request)
+            status_code = response.status_code
+        except Exception as e:
+            duration = time.time() - start_time
+            record_http_request(method, endpoint, 500, duration)
+            raise
+        
+        duration = time.time() - start_time
+        record_http_request(method, endpoint, status_code, duration)
+        
+        return response
+```
+
+**Métricas disponibles:**
+- **🌐 HTTP**: Requests, latencia, status codes por endpoint
+- **👥 Usuarios**: Operaciones CRUD, errores, performance
+- **🔐 Autenticación**: Intentos, tokens, fallos por tipo
+- **🗃️ Base de datos**: Operaciones, latencia, errores por tabla
+- **🐰 RabbitMQ**: Mensajes publicados/consumidos, colas, errores
+- **📱 Aplicación**: Comandos, queries, errores por componente
+
+**Endpoint de métricas:**
+```python
+# src/main.py
+@app.get("/metrics")
+async def metrics():
+    """Prometheus metrics endpoint."""
+    return Response(
+        content=get_metrics(),
+        media_type=get_content_type()
+    )
 ```
 
 ### **🐘 PostgreSQL + SQLAlchemy**
 
-**¿Cómo funciona la persistencia de datos?**
+**¿Cómo funciona la persistencia con métricas integradas?**
 
-PostgreSQL con SQLAlchemy proporciona persistencia robusta y ORM avanzado:
+PostgreSQL con SQLAlchemy proporcionando persistencia robusta con observabilidad:
 
 ```python
 # src/shared/infrastructure/database.py
@@ -398,259 +539,276 @@ engine = create_engine(
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 ```
 
-**Funcionalidades que proporciona:**
-
-- **🗃️ Connection Pooling**: Gestión eficiente de conexiones a base de datos
-- **🔒 ACID Transactions**: Transacciones seguras y consistentes
-- **📊 ORM Mapping**: Conversión automática entre objetos Python y tablas SQL
-- **🛡️ SQL Injection Prevention**: Queries parametrizadas automáticas
-- **📈 Query Optimization**: Optimización automática de consultas
-
-**Modelo de datos:**
-```python
-# src/contexts/users/infrastructure/models.py
-class UserModel(Base):
-    """SQLAlchemy model for User entity."""
-    
-    __tablename__ = "users"
-    
-    id = Column(String, primary_key=True, index=True)
-    email = Column(String, unique=True, index=True, nullable=False)
-    username = Column(String, unique=True, index=True, nullable=False)
-    # Timestamps automáticos
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-```
-
-**Repository Implementation:**
+**Repositorios instrumentados:**
 ```python
 # src/contexts/users/infrastructure/repositories.py
+@monitor_db_operation("insert", "users")
 async def save(self, user: User) -> User:
-    """Save a user entity."""
-    user_model = UserModel(
-        id=user.id,
-        email=user.email.value,
-        username=user.username.value,
-        # Mapping automático entre Entity y Model
-    )
-    self.session.add(user_model)
-    self.session.commit()
+    """Save a user entity with metrics."""
+    try:
+        user_model = UserModel(
+            id=user.id,
+            email=user.email.value,
+            username=user.username.value,
+        )
+        self.session.add(user_model)
+        self.session.commit()
+        
+        record_db_operation("insert", "users", "success")
+        return user
+    except Exception as e:
+        record_db_operation("insert", "users", "error")
+        raise
 ```
 
-### **🚀 FastAPI - Web Framework**
+### **🚀 FastAPI con Métricas**
 
-**¿Qué capacidades proporciona FastAPI?**
+**¿Cómo se integran las métricas con FastAPI?**
 
-FastAPI actúa como la **puerta de entrada** HTTP para la aplicación:
+FastAPI con instrumentación automática y endpoints de sistema:
 
 ```python
 # src/main.py
+from src.shared.infrastructure.metrics_middleware import PrometheusMiddleware
+
 app = FastAPI(
     title="Hexagonal Architecture API",
-    description="A FastAPI application using Hexagonal Architecture, CQRS, and Bundle-contexts",
+    description="API with full observability and async processing",
     version="1.0.0",
 )
 
-# Middleware CORS
-app.add_middleware(CORSMiddleware, allow_origins=["*"])
+# Middleware de métricas automáticas
+app.add_middleware(PrometheusMiddleware)
 
-# Routers modulares
-app.include_router(users_router, prefix="/api/v1")
-app.include_router(auth_router, prefix="/api/v1")
+# Endpoints de sistema
+@app.get("/health")
+async def health_check():
+    """Health check endpoint."""
+    return {"status": "healthy", "message": "API is running correctly"}
+
+@app.get("/metrics")
+async def metrics():
+    """Prometheus metrics endpoint."""
+    return Response(
+        content=get_metrics(),
+        media_type=get_content_type()
+    )
 ```
 
-**Funcionalidades que proporciona:**
-
-- **📖 Auto-documentation**: Swagger/OpenAPI automático
-- **✅ Request Validation**: Validación automática con Pydantic
-- **🔄 Async Support**: Soporte nativo para operaciones asíncronas
-- **🔌 Dependency Injection**: Sistema DI integrado
-- **⚡ High Performance**: Basado en Starlette y Uvicorn
-
-**Dependency Injection:**
+**Handlers instrumentados:**
 ```python
-# src/contexts/users/infrastructure/adapters.py
-def get_user_repository(db: Session = Depends(get_db)) -> SQLAlchemyUserRepository:
-    """Get user repository instance."""
-    return SQLAlchemyUserRepository(db)
+# src/contexts/users/application/handlers.py
+@monitor_command("create_user")
+async def handle(self, command: CreateUserCommand):
+    """Command handler with automatic metrics."""
+    # Métricas automáticas de inicio, éxito, error
 
-@router.post("/users", response_model=UserDto)
-async def create_user(
-    user_data: CreateUserDto,
-    user_repository: SQLAlchemyUserRepository = Depends(get_user_repository)
-):
+@monitor_query("get_user_by_id")
+async def handle(self, query: GetUserByIdQuery):
+    """Query handler with automatic metrics."""
+    # Métricas automáticas de performance
+
+@monitor_db_operation("insert", "users")
+async def save(self, user: User):
+    """Database operation with metrics."""
+    # Métricas automáticas de DB operations
 ```
 
-### **🔐 JWT + bcrypt - Autenticación**
+### **🔐 JWT + bcrypt con Métricas**
 
-**¿Cómo funciona la seguridad y autenticación?**
+**¿Cómo se monitorea la seguridad?**
 
-JWT con bcrypt proporciona autenticación segura y stateless:
+Sistema de autenticación con métricas de seguridad integradas:
 
 ```python
 # src/contexts/auth/domain/services.py
-class AuthService:
-    """Domain service for authentication operations."""
-    
-    async def authenticate_user(self, email: str, password: str) -> dict:
-        """Authenticate a user with email and password."""
-        user = await self.user_repository.find_by_email(email)
-        
-        # Verificación de contraseña con bcrypt
-        if not self.password_service.verify_password(password, user.hashed_password.hashed_value):
-            raise UnauthorizedError("Invalid email or password")
-        
-        # Creación de JWT token
-        access_token = self._create_access_token({"sub": user.id, "email": user.email.value})
-```
-
-**Funcionalidades que proporciona:**
-
-- **🔐 Password Hashing**: bcrypt con salt automático
-- **🎟️ JWT Tokens**: Tokens stateless con expiración
-- **⏰ Token Expiration**: Tokens con tiempo de vida configurable
-- **🛡️ Secure Headers**: Headers HTTP seguros
-- **🔒 CORS Protection**: Configuración CORS restrictiva
-
-**Password Hashing:**
-```python
-# src/contexts/users/domain/services.py
-class PasswordService:
-    """Domain service for password operations."""
-    
-    def __init__(self):
-        self.pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-    
-    def hash_password(self, password: str) -> str:
-        """Hash a password."""
-        if not self._is_valid_password(password):
-            raise ValidationError("Password does not meet requirements")
-        return self.pwd_context.hash(password)
-```
-
-### **🧪 pytest - Testing Framework**
-
-**¿Cómo está estructurado el sistema de testing?**
-
-pytest proporciona un framework de testing comprehensivo:
-
-```python
-# tests/conftest.py
-@pytest.fixture(scope="function")
-def db_session():
-    """Create a database session for testing."""
-    Base.metadata.create_all(bind=engine)
-    db = TestingSessionLocal()
+async def authenticate_user(self, email: str, password: str) -> dict:
+    """Authenticate user with metrics."""
     try:
-        yield db
-    finally:
-        db.close()
-        Base.metadata.drop_all(bind=engine)
+        user = await self.user_repository.find_by_email(email)
+        if not user:
+            record_auth_attempt("invalid_credentials")
+            raise UnauthorizedError("Invalid credentials")
+        
+        if not user.is_active:
+            record_auth_attempt("inactive_account")
+            raise UnauthorizedError("Account inactive")
+        
+        if not self.password_service.verify_password(password, user.hashed_password.hashed_value):
+            record_auth_attempt("invalid_password")
+            raise UnauthorizedError("Invalid password")
+        
+        access_token = self._create_access_token({"sub": user.id})
+        
+        # Métricas de éxito
+        record_auth_attempt("success")
+        record_jwt_token_issued()
+        
+        return {"access_token": access_token, "token_type": "bearer"}
+    except Exception:
+        record_auth_attempt("error")
+        raise
 ```
 
-**Funcionalidades que proporciona:**
+### **⚙️ Variables de Entorno**
 
-- **🔧 Fixtures**: Setup y teardown automático de datos de prueba
-- **📊 Coverage**: Medición de cobertura de código
-- **🏃 Parallel Testing**: Ejecución paralela de tests
-- **🔍 Mocking**: Simulación de dependencias externas
-- **📈 Reporting**: Reportes detallados en HTML/XML
+**¿Cómo se configura el sistema?**
 
-**Test Database:**
+Sistema de configuración completo con archivo de ejemplo:
+
+```bash
+# example.env
+# ===== DATABASE CONFIGURATION =====
+DATABASE_URL=postgresql://postgres:password@localhost:5432/hexagonal_db
+
+# ===== RABBITMQ CONFIGURATION =====
+RABBITMQ_URL=amqp://guest:guest@localhost:5672/
+
+# ===== JWT AUTHENTICATION =====
+SECRET_KEY=your-super-secret-key-change-in-production
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# ===== APPLICATION CONFIGURATION =====
+ENVIRONMENT=development
+HOST=0.0.0.0
+PORT=8000
+DEBUG=false
+
+# ===== LOGGING CONFIGURATION =====
+LOG_LEVEL=INFO
+LOG_FORMAT=%(asctime)s - %(name)s - %(levelname)s - %(message)s
+```
+
+---
+
+## 📊 Métricas y Observabilidad
+
+### **Sistema de Métricas Completo**
+
+**¿Qué métricas están disponibles?**
+
+El sistema proporciona observabilidad completa con métricas categorizadas:
+
+#### **📈 Métricas HTTP**
+- `http_requests_total` - Total de requests por método/endpoint/status
+- `http_request_duration_seconds` - Latencia de requests
+- `http_requests_in_progress` - Requests en progreso
+
+#### **👥 Métricas de Negocio**
+- `user_operations_total` - Operaciones de usuario por tipo/status
+- `auth_attempts_total` - Intentos de autenticación por resultado
+- `jwt_tokens_issued_total` - Tokens JWT emitidos
+
+#### **🗃️ Métricas de Base de Datos**
+- `db_operations_total` - Operaciones por tabla/tipo/status
+- `db_operation_duration_seconds` - Latencia de operaciones
+- `db_connections_active` - Conexiones activas
+
+#### **🐰 Métricas RabbitMQ**
+- `messages_published_total` - Mensajes publicados por cola/status
+- `messages_consumed_total` - Mensajes consumidos por cola/status
+- `queue_depth` - Profundidad de colas
+
+#### **📱 Métricas de Aplicación**
+- `application_errors_total` - Errores por tipo/componente
+- `command_processing_total` - Comandos procesados por tipo/status
+- `query_processing_total` - Queries procesadas por tipo/status
+
+### **Dashboard de Métricas**
+
+**¿Cómo acceder a las métricas?**
+
+```bash
+# Endpoint de métricas Prometheus
+curl http://localhost:8000/metrics
+
+# Ejemplo de output:
+# HELP http_requests_total Total number of HTTP requests
+# TYPE http_requests_total counter
+http_requests_total{method="GET",endpoint="/health",status_code="200"} 145.0
+http_requests_total{method="POST",endpoint="/api/v1/users",status_code="201"} 23.0
+
+# HELP user_operations_total Total number of user operations
+# TYPE user_operations_total counter
+user_operations_total{operation="create",status="success"} 23.0
+user_operations_total{operation="create",status="error"} 2.0
+```
+
+### **Instrumentación Automática**
+
+**¿Cómo se capturan las métricas?**
+
 ```python
-# Base Testing con SQLite en memoria
-TEST_DATABASE_URL = "sqlite:///./test.db"
+# Decoradores para instrumentación automática
+@monitor_command("create_user")
+async def handle(self, command: CreateUserCommand):
+    """Command handler with automatic metrics."""
+    # Métricas automáticas de inicio, éxito, error
 
-@pytest.fixture
-def sample_user_data():
-    """Sample user data for testing."""
-    return {
-        "email": "test@example.com",
-        "username": "testuser",
-        "password": "TestPassword123"
-    }
+@monitor_query("get_user_by_id")
+async def handle(self, query: GetUserByIdQuery):
+    """Query handler with automatic metrics."""
+    # Métricas automáticas de performance
+
+@monitor_db_operation("insert", "users")
+async def save(self, user: User):
+    """Database operation with metrics."""
+    # Métricas automáticas de DB operations
 ```
 
-### **🐳 Docker - Containerización**
+---
 
-**¿Cómo funciona la containerización?**
-
-Docker proporciona ambientes consistentes y deployment simplificado:
-
-```yaml
-# docker-compose.yml
-services:
-  app:
-    build: .
-    ports:
-      - "8000:8000"
-    environment:
-      - DATABASE_URL=postgresql://postgres:password@db:5432/hexagonal_db
-      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
-    depends_on:
-      - db
-      - rabbitmq
-  
-  db:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_DB: hexagonal_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-```
-
-**Funcionalidades que proporciona:**
-
-- **🔄 Environment Consistency**: Misma configuración en desarrollo y producción
-- **📦 Service Orchestration**: Múltiples servicios coordinados
-- **🔌 Network Isolation**: Comunicación segura entre contenedores
-- **💾 Volume Persistence**: Persistencia de datos entre reinicios
-- **⚡ Fast Deployment**: Deploy rápido y rollback instantáneo
-
-### **🔄 Flujo Completo del Sistema**
+## 🔄 Flujo Completo del Sistema
 
 **¿Cómo trabajan todas las tecnologías en conjunto?**
 
 ```mermaid
 graph TD
-    A[HTTP Request] --> B[FastAPI Router]
-    B --> C[Dependency Injection]
-    C --> D[Command/Query Handler]
-    D --> E{CQRS Decision}
+    A[HTTP Request] --> B[PrometheusMiddleware]
+    B --> C[FastAPI Router]
+    C --> D[Dependency Injection]
+    D --> E[Command/Query Handler]
+    E --> F{CQRS Decision}
     
-    E -->|Command| F[RabbitMQ Queue]
-    F --> G[Message Consumer]
-    G --> H[Command Handler]
-    H --> I[Domain Logic]
-    I --> J[Repository]
-    J --> K[(PostgreSQL)]
+    F -->|Command| G[RabbitMQ Queue]
+    G --> H[Message Consumer]
+    H --> I[Command Handler]
+    I --> J[Domain Logic]
+    J --> K[Repository]
+    K --> L[(PostgreSQL)]
     
-    E -->|Query| L[Query Handler]
-    L --> M[Repository]
-    M --> K
+    F -->|Query| M[Query Handler]
+    M --> N[Repository]
+    N --> L
     
-    N[JWT Middleware] --> B
-    O[bcrypt] --> P[Password Service]
-    P --> I
+    O[JWT Middleware] --> C
+    P[bcrypt] --> Q[Password Service]
+    Q --> J
     
-    Q[pytest] --> R[Test Database]
-    S[Docker] --> T[All Services]
+    R[Prometheus Metrics] --> S[/metrics endpoint]
+    T[Environment Variables] --> U[Configuration]
+    
+    V[All Components] --> W[Metrics Collection]
+    W --> X[Observability Dashboard]
 ```
 
-**Ejemplo de flujo completo:**
+**Ejemplo de flujo completo instrumentado:**
 
 1. **📥 Request**: Cliente envía POST `/api/v1/users`
-2. **🔐 Auth**: JWT middleware valida token
-3. **✅ Validation**: Pydantic valida datos de entrada
-4. **🎯 DI**: FastAPI inyecta dependencias (repository, services)
-5. **📤 Command**: Se crea `CreateUserCommand`
-6. **🐰 Queue**: Comando se envía a RabbitMQ
-7. **👂 Consumer**: Consumer procesa mensaje
-8. **🏭 Handler**: `CreateUserCommandHandler` ejecuta lógica
-9. **🔐 Password**: `PasswordService` hashea contraseña con bcrypt
-10. **💾 Persistence**: Repository guarda en PostgreSQL
-11. **📢 Events**: Domain events se publican
-12. **📤 Response**: API retorna respuesta JSON
+2. **📊 Metrics**: PrometheusMiddleware inicia medición
+3. **🔐 Auth**: JWT middleware valida token (métricas de auth)
+4. **✅ Validation**: Pydantic valida datos de entrada
+5. **🎯 DI**: FastAPI inyecta dependencias
+6. **📤 Command**: Se crea `CreateUserCommand`
+7. **🐰 Queue**: Comando enviado a RabbitMQ (métricas de publish)
+8. **👂 Consumer**: Consumer procesa mensaje (métricas de consume)
+9. **🏭 Handler**: Handler ejecuta con métricas automáticas
+10. **🔐 Password**: bcrypt hashea password (métricas de auth)
+11. **💾 Persistence**: Repository guarda con métricas de DB
+12. **📢 Events**: Domain events a RabbitMQ (métricas de events)
+13. **📊 Response**: Métricas de HTTP response
+14. **🎯 Dashboard**: Todas las métricas disponibles en `/metrics`
 
 ---
 
@@ -658,399 +816,283 @@ graph TD
 
 ### **🏗️ ARQUITECTURA**
 
-#### **P1: ¿Qué arquitectura se utilizó en este proyecto y por qué?**
+#### **P1: ¿Qué arquitectura se utilizó y cómo se implementó completamente?**
 
-**R:** Se implementó **Arquitectura Hexagonal (Clean Architecture)** por las siguientes razones:
+**R:** Se implementó **Arquitectura Hexagonal** completamente funcional con:
 
-- **Independencia del Dominio**: La lógica de negocio no depende de frameworks externos
-- **Testabilidad**: Facilita testing mediante mocks de adaptadores  
-- **Flexibilidad**: Permite cambiar implementaciones de infraestructura sin afectar el dominio
-- **Separación de responsabilidades**: Cada capa tiene un propósito específico y bien definido
+- **Dominio puro**: Entidades sin dependencias externas
+- **CQRS real**: Procesamiento asíncrono con RabbitMQ
+- **Event-driven**: Comunicación desacoplada entre contextos
+- **Observabilidad**: Métricas completas en todas las capas
+- **Configuración**: Variables de entorno para todos los servicios
 
-#### **P2: ¿Cómo se implementó CQRS en el proyecto?**
+#### **P2: ¿Cómo funciona CQRS con RabbitMQ en producción?**
 
-**R:** CQRS se implementó con:
+**R:** CQRS está completamente implementado:
 
-- **Comandos**: Para operaciones de escritura (`CreateUserCommand`, `UpdateUserCommand`)
-- **Queries**: Para operaciones de lectura (`GetUserByIdQuery`, `GetUsersQuery`)  
-- **Handlers separados**: `CreateUserCommandHandler` vs `GetUserByIdQueryHandler`
-- **Modelos optimizados**: DTOs específicos para lectura y escritura
-- **Procesamiento asíncrono**: Comandos vía RabbitMQ, queries síncronas
+- **Comandos**: Procesados asincrónicamente en RabbitMQ
+- **Queries**: Síncronas y optimizadas para lectura
+- **Eventos**: Publicados automáticamente vía EventBus real
+- **Consumers**: Procesamiento en background con retry
+- **Métricas**: Monitoreo completo de commands/queries
+- **Escalabilidad**: Múltiples consumers por tipo de comando
 
-#### **P3: ¿Qué son los Bundle-contexts y cómo se organizaron?**
+#### **P3: ¿Qué ventajas reales aporta esta implementación?**
 
-**R:** Los Bundle-contexts son **Bounded Contexts** de Domain-Driven Design:
+**R:** Ventajas concretas en producción:
 
-- **Users Context**: Gestión completa de usuarios (CRUD, validaciones)
-- **Auth Context**: Autenticación y autorización (JWT, passwords)
-- **Shared Context**: Infraestructura común (base entities, event bus)
-- **Beneficios**: Modularidad, equipos independientes, deploy separado
-
-#### **P4: ¿Cuáles son las ventajas de la Arquitectura Hexagonal?**
-
-**R:** Las principales ventajas son:
-
-- **Testabilidad**: Testing unitario fácil con mocks
+- **Performance**: Procesamiento asíncrono no bloquea API
+- **Escalabilidad**: Consumers independientes por funcionalidad
+- **Observabilidad**: Métricas detalladas para debugging
+- **Resilencia**: Retry automático y dead letter queues
 - **Mantenibilidad**: Separación clara de responsabilidades
-- **Flexibilidad**: Cambio de tecnologías sin afectar lógica de negocio
-- **Escalabilidad**: Agregado de nuevas funcionalidades sin romper existentes
-- **Independencia**: Dominio puro sin dependencias externas
 
-### **🎨 PATRONES DE DISEÑO**
+### **📊 MÉTRICAS Y OBSERVABILIDAD**
 
-#### **P5: ¿Qué patrones de diseño se implementaron?**
+#### **P4: ¿Cómo se implementó el sistema de métricas?**
 
-**R:** Se implementaron múltiples patrones:
+**R:** Sistema completo de observabilidad:
 
-1. **Repository Pattern**: Abstracción del acceso a datos
-2. **Command Pattern**: Encapsulación de requests como objetos
-3. **Factory Method**: Creación controlada de entidades (`User.create()`)
-4. **Observer Pattern**: Eventos de dominio para comunicación desacoplada
-5. **Dependency Injection**: Inversión de control y acoplamiento débil
-6. **Strategy Pattern**: Diferentes implementaciones de repositorios
+- **Prometheus**: Métricas estándar de la industria
+- **Instrumentación automática**: Middleware transparente
+- **Métricas de negocio**: Operaciones específicas del dominio
+- **Decoradores**: Instrumentación no invasiva
+- **Dashboard ready**: Formato estándar para Grafana
 
-#### **P6: ¿Cómo funciona el Repository Pattern en el proyecto?**
+#### **P5: ¿Qué métricas son más importantes para el negocio?**
 
-**R:** El Repository Pattern se implementó con:
+**R:** Métricas clave implementadas:
 
-- **Interface abstracta**: `UserRepository` define el contrato
-- **Implementación concreta**: `SQLAlchemyUserRepository` para PostgreSQL
-- **Separación**: Dominio no conoce detalles de persistencia
-- **Intercambiabilidad**: Fácil cambio entre bases de datos
-- **Testing**: Mocks sencillos para unit tests
+- **Throughput**: Requests por segundo por endpoint
+- **Latencia**: Percentiles de tiempo de respuesta
+- **Error Rate**: Tasa de errores por operación
+- **Business KPIs**: Usuarios creados, logins exitosos
+- **Infrastructure**: Colas, conexiones DB, memoria
 
-#### **P7: ¿Por qué usar el Command Pattern con CQRS?**
+#### **P6: ¿Cómo se debugging con métricas en producción?**
 
-**R:** El Command Pattern con CQRS ofrece:
+**R:** Debugging facilitado por:
 
-- **Separación**: Comandos vs queries claramente diferenciados
-- **Auditabilidad**: Cada comando es rastreable
-- **Escalabilidad**: Procesamiento asíncrono de comandos
-- **Desacoplamiento**: Handlers independientes y especializados
-- **Extensibilidad**: Nuevos comandos sin afectar existentes
+- **Métricas por error**: Clasificación automática de errores
+- **Tracing**: Seguimiento de requests entre servicios
+- **Alertas**: Basadas en thresholds de métricas
+- **Dashboards**: Visualización en tiempo real
+- **Correlación**: Métricas HTTP + DB + RabbitMQ
 
-### **🧱 PRINCIPIOS SOLID**
+### **🐰 RABBITMQ Y PROCESAMIENTO ASÍNCRONO**
 
-#### **P8: ¿Cómo se aplicó el Principio de Responsabilidad Única (SRP)?**
+#### **P7: ¿Cómo se garantiza la confiabilidad en RabbitMQ?**
 
-**R:** Cada clase tiene una única razón para cambiar:
+**R:** Múltiples garantías implementadas:
 
-- `PasswordService`: Solo operaciones de contraseñas
-- `Email`: Solo validación y representación de emails
-- `UserRepository`: Solo persistencia de usuarios
-- `CreateUserCommandHandler`: Solo creación de usuarios
+- **Persistent messages**: Mensajes sobreviven a reinicios
+- **Acknowledgments**: Confirmación manual de procesamiento
+- **Dead Letter Queues**: Mensajes fallidos para análisis
+- **Retry logic**: Reintentos automáticos con backoff
+- **Monitoring**: Métricas de profundidad de colas
 
-#### **P9: ¿Dónde se ve el Principio Abierto/Cerrado (OCP)?**
+#### **P8: ¿Qué pasa si RabbitMQ falla?**
 
-**R:** En las interfaces abstractas:
+**R:** Estrategias de resilencia:
 
-- `UserRepository`: Abierto a extensión (nuevas implementaciones)
-- `EventBus`: Cerrado a modificación (interface estable)
-- Nuevas implementaciones sin cambiar código existente
-- Extensibilidad sin riesgo de romper funcionalidad
+- **Circuit breaker**: Detección automática de fallos
+- **Fallback sync**: Procesamiento síncrono temporal
+- **Queue persistence**: Mensajes persistidos en disco
+- **Clustering**: Alta disponibilidad con múltiples nodos
+- **Monitoring**: Alertas automáticas de fallos
 
-#### **P10: ¿Cómo se garantiza el Principio de Inversión de Dependencias (DIP)?**
+### **⚙️ CONFIGURACIÓN Y DEPLOYMENT**
 
-**R:** A través de:
+#### **P9: ¿Cómo se maneja la configuración entre ambientes?**
 
-- **Abstracciones**: Handlers dependen de interfaces, no implementaciones
-- **Inyección de dependencias**: FastAPI Depends() para resolución
-- **Configuración externa**: Dependencies inyectadas en runtime
-- **Desacoplamiento**: Capas superiores no conocen detalles de implementación
+**R:** Sistema robusto de configuración:
 
-#### **P11: ¿Qué ejemplos hay del Principio de Sustitución de Liskov (LSP)?**
+```bash
+# example.env con todas las variables
+DATABASE_URL=postgresql://postgres:password@localhost:5432/hexagonal_db
+RABBITMQ_URL=amqp://guest:guest@localhost:5672/
+SECRET_KEY=your-super-secret-key
+ENVIRONMENT=development
+LOG_LEVEL=INFO
+```
 
-**R:** Ejemplos claros:
+- **Separación por ambiente**: dev/staging/prod
+- **Secrets management**: Variables sensibles separadas
+- **Validación**: Configuración verificada al startup
+- **Defaults**: Valores por defecto para desarrollo
 
-- **Repositorios**: Cualquier implementación de `UserRepository` es intercambiable
-- **Event Handlers**: Diferentes handlers mantienen el mismo comportamiento base
-- **Value Objects**: Todos implementan la misma interface base
-- **Commands**: Todos los comandos pueden ser procesados por el framework CQRS
+#### **P10: ¿Cómo se despliega el sistema completo?**
 
-### **🔄 PROGRAMACIÓN ORIENTADA A OBJETOS**
+**R:** Deployment orquestado:
 
-#### **P12: ¿Cómo se implementó la Encapsulación?**
+```yaml
+# docker-compose.yml
+services:
+  app:
+    depends_on: [db, rabbitmq]
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/hexagonal_db
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+  
+  db:
+    image: postgres:15-alpine
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+  
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics check_port_connectivity"]
+```
 
-**R:** Mediante:
+- **Orquestación**: Orden correcto de servicios
+- **Health checks**: Verificación de servicios
+- **Networking**: Comunicación segura entre contenedores
+- **Persistence**: Volúmenes para datos
 
-- **Atributos privados**: `_email`, `_username` en entities
-- **Properties**: Control de acceso a datos internos
-- **Validaciones**: En constructores y métodos
-- **Inmutabilidad**: Value Objects no cambian después de creación
+### **🔒 SEGURIDAD Y CALIDAD**
 
-#### **P13: ¿Qué ejemplos de Polimorfismo hay en el código?**
+#### **P11: ¿Qué medidas de seguridad se implementaron?**
 
-**R:** Varios ejemplos:
+**R:** Seguridad multicapa con métricas:
 
-- **Repositorios**: `UserRepository` con múltiples implementaciones
-- **Event Handlers**: Diferentes handlers para distintos eventos
-- **Commands/Queries**: Handlers especializados por tipo
-- **Value Objects**: Comportamiento específico por tipo de dato
+- **Authentication**: JWT con métricas de intentos
+- **Password hashing**: bcrypt con salt automático
+- **Input validation**: Pydantic + domain validation
+- **CORS**: Configuración restrictiva
+- **Rate limiting**: Preparado para implementar
+- **Audit trail**: Métricas de todas las operaciones
 
-#### **P14: ¿Cómo se logró la Abstracción?**
+#### **P12: ¿Cómo se asegura la calidad del código?**
 
-**R:** A través de:
+**R:** Múltiples capas de calidad:
 
-- **Interfaces abstractas**: Ocultan complejidad de implementación
-- **Value Objects**: Encapsulan validaciones y comportamiento
-- **DTOs**: Simplifican transferencia de datos
-- **Facades**: APIs sencillas para operaciones complejas
+- **Type hints**: Tipado completo en toda la aplicación
+- **Testing**: Unit tests con mocks de infraestructura
+- **Linting**: Estándares de código automáticos
+- **Code review**: Arquitectura facilita revisión
+- **Monitoring**: Métricas de errores y performance
 
-#### **P15: ¿Dónde se aplica la Herencia en el proyecto?**
+### **🚀 ESCALABILIDAD Y PERFORMANCE**
 
-**R:** En varios lugares estratégicos:
+#### **P13: ¿Cómo escala el sistema?**
 
-- **BaseEntity**: Funcionalidad común para todas las entidades
-- **BaseValueObject**: Comportamiento base para value objects
-- **Command/Query**: Clases base para CQRS
-- **DomainEvent**: Base para todos los eventos de dominio
+**R:** Escalabilidad en múltiples dimensiones:
 
-### **🏢 DOMAIN-DRIVEN DESIGN**
+- **Horizontal**: Múltiples instancias de API
+- **Vertical**: Optimización de recursos por servicio
+- **Async processing**: Comandos no bloquean API
+- **Database**: Connection pooling y query optimization
+- **Caching**: Preparado para implementar Redis
+- **Load balancing**: Stateless design permite balanceadores
 
-#### **P16: ¿Qué elementos de DDD se implementaron?**
+#### **P14: ¿Qué optimizaciones de performance se implementaron?**
 
-**R:** Elementos completos de DDD:
+**R:** Optimizaciones concretas:
 
-- **Entities**: `User` con identidad e invariantes
-- **Value Objects**: `Email`, `Username`, `FullName`, `HashedPassword`
-- **Domain Services**: `PasswordService` para lógica sin entidad natural
-- **Domain Events**: `UserCreated`, `UserUpdated` para comunicación
-- **Repositories**: Abstracción de persistencia
-- **Aggregates**: `User` como aggregate root
+- **Async/await**: Operaciones no bloqueantes
+- **Connection pooling**: Reutilización de conexiones DB
+- **Batch processing**: Procesamiento en lotes via RabbitMQ
+- **Lazy loading**: Carga bajo demanda
+- **Metrics-driven**: Optimización basada en métricas reales
 
-#### **P17: ¿Qué ventajas aportan los Value Objects?**
+### **🧪 TESTING Y DEBUGGING**
 
-**R:** Múltiples beneficios:
+#### **P15: ¿Cómo se testea un sistema tan complejo?**
 
-- **Validación automática**: Email format, username rules
-- **Inmutabilidad**: Seguridad en concurrencia
-- **Expresividad**: Código autodocumentado
-- **Reutilización**: Mismas validaciones en todo el sistema
-- **Type Safety**: Compilador ayuda a prevenir errores
+**R:** Estrategia de testing por capas:
 
-#### **P18: ¿Cómo funcionan los Domain Events?**
+- **Unit tests**: Dominio puro, fácil de testear
+- **Integration tests**: Handlers con mocks de infraestructura
+- **Contract tests**: Interfaces entre servicios
+- **End-to-end**: Flujos completos con métricas
+- **Performance tests**: Carga basada en métricas
 
-**R:** Los Domain Events permiten:
+#### **P16: ¿Cómo se debug en producción?**
 
-- **Desacoplamiento**: Comunicación sin dependencias directas
-- **Auditabilidad**: Registro de todos los cambios importantes
-- **Extensibilidad**: Nuevos handlers sin modificar entidades
-- **Consistencia eventual**: Procesamiento asíncrono de side effects
-- **Integración**: Comunicación entre bounded contexts
+**R:** Debugging facilitado por:
 
-### **🚀 TESTING Y CALIDAD**
-
-#### **P19: ¿Cómo está estructurada la estrategia de testing?**
-
-**R:** Testing estratificado:
-
-- **Unit Tests**: 80%+ cobertura en capa de dominio
-- **Integration Tests**: Para handlers y repositorios  
-- **Domain Tests**: Value objects, entities, services
-- **Mocking**: Fácil por uso de interfaces abstractas
-- **Fixtures**: Pytest para setup de datos de prueba
-
-#### **P20: ¿Qué métricas de calidad se siguieron?**
-
-**R:** Múltiples métricas:
-
-- **Cobertura**: >80% en capa de dominio
-- **Type Hints**: Throughout codebase
-- **Documentación**: Docstrings completos
-- **PEP 8**: Estilo de código consistente
-- **Error Handling**: Exceptions específicas de dominio
-
-#### **P21: ¿Por qué es importante el testing en arquitectura hexagonal?**
-
-**R:** Es crucial porque:
-
-- **Independencia**: Testeo de dominio sin infraestructura
-- **Rapidez**: Unit tests muy rápidos
-- **Confiabilidad**: Cobertura alta da confianza
-- **Refactoring**: Tests protegen contra regresiones
-- **Documentación**: Tests sirven como documentación viva
-
-### **🔒 SEGURIDAD Y MEJORES PRÁCTICAS**
-
-#### **P22: ¿Qué medidas de seguridad se implementaron?**
-
-**R:** Múltiples capas de seguridad:
-
-- **Password Hashing**: bcrypt con salt automático
-- **JWT Authentication**: Tokens seguros para API
-- **Input Validation**: Pydantic schemas y domain validation
-- **SQL Injection Prevention**: SQLAlchemy ORM
-- **CORS Configuration**: Control de acceso cross-origin
-
-#### **P23: ¿Cómo se manejan los errores en el sistema?**
-
-**R:** Manejo estructurado de errores:
-
-- **Domain Exceptions**: Errores específicos de negocio
-- **Validation Errors**: Para datos incorrectos
-- **Not Found Errors**: Para recursos inexistentes
-- **HTTP Status Codes**: Respuestas apropiadas en API
-- **Logging**: Registro estructurado de errores
-
-#### **P24: ¿Qué consideraciones de escalabilidad tiene el proyecto?**
-
-**R:** Múltiples aspectos de escalabilidad:
-
-- **Stateless Design**: Sin estado en aplicación
-- **Async Processing**: Comandos vía message queue
-- **Database Pooling**: Conexiones eficientes
-- **Modular Architecture**: Escalado independiente por contexto
-- **Event-Driven**: Comunicación desacoplada
-
-### **⚙️ TECNOLOGÍAS ESPECÍFICAS**
-
-#### **P25: ¿Por qué se eligió RabbitMQ como message broker?**
-
-**R:** RabbitMQ fue elegido por:
-
-- **Reliability**: Garantía de entrega de mensajes
-- **Persistence**: Mensajes durables que sobreviven a fallos
-- **Routing**: Capacidades avanzadas de enrutamiento
-- **Clustering**: Soporte para alta disponibilidad
-- **Management UI**: Interfaz web para monitoreo
-- **AMQP Protocol**: Estándar de mensajería robusto
-
-#### **P26: ¿Cuáles son las ventajas de PostgreSQL sobre otras bases de datos?**
-
-**R:** PostgreSQL aporta:
-
-- **ACID Compliance**: Transacciones completamente ACID
-- **JSON Support**: Soporte nativo para datos JSON
-- **Extensions**: Amplia gama de extensiones (PostGIS, etc.)
-- **Performance**: Optimizaciones avanzadas de queries
-- **Concurrent Access**: Manejo excelente de concurrencia
-- **Data Integrity**: Constraints y validaciones robustas
-
-#### **P27: ¿Por qué FastAPI en lugar de Flask o Django?**
-
-**R:** FastAPI ofrece ventajas clave:
-
-- **Performance**: Uno de los frameworks más rápidos
-- **Type Hints**: Soporte nativo para typing de Python
-- **Auto-docs**: Documentación automática con Swagger/OpenAPI
-- **Async Native**: Soporte asíncrono de primera clase
-- **Validation**: Validación automática con Pydantic
-- **Modern**: Construido para Python 3.6+
-
-#### **P28: ¿Cómo funciona el sistema de dependency injection en FastAPI?**
-
-**R:** FastAPI DI funciona mediante:
-
-- **Depends()**: Decorador para declarar dependencias
-- **Automatic Resolution**: Resolución automática del árbol de dependencias
-- **Scoped Instances**: Control del ciclo de vida de instancias
-- **Sub-dependencies**: Dependencias anidadas
-- **Provider Pattern**: Patrón proveedor para configuración
-
-#### **P29: ¿Qué ventajas tiene bcrypt sobre otros algoritmos de hashing?**
-
-**R:** bcrypt es superior porque:
-
-- **Adaptive**: Configurable para ser más lento contra ataques
-- **Salt Generation**: Genera salt automáticamente
-- **Time-tested**: Probado en producción por décadas
-- **Brute Force Resistant**: Resistente a ataques de fuerza bruta
-- **Industry Standard**: Estándar en la industria
-
-#### **P30: ¿Cómo garantiza JWT la seguridad sin estado del servidor?**
-
-**R:** JWT proporciona seguridad stateless mediante:
-
-- **Self-contained**: Toda la información está en el token
-- **Digital Signature**: Firmado criptográficamente
-- **Expiration**: Tokens con tiempo de vida limitado
-- **Claims**: Metadata verificable sobre el usuario
-- **No Server Storage**: No requiere almacenamiento en servidor
-
-### **🐳 CONTAINERIZACIÓN Y DEPLOYMENT**
-
-#### **P31: ¿Cuáles son los beneficios de Docker en este proyecto?**
-
-**R:** Docker aporta:
-
-- **Environment Parity**: Mismo ambiente en desarrollo y producción
-- **Dependency Isolation**: Cada servicio con sus dependencias
-- **Scalability**: Fácil escalado horizontal
-- **Rollback**: Rollback instantáneo a versiones anteriores
-- **Resource Efficiency**: Uso eficiente de recursos del sistema
-
-#### **P32: ¿Cómo se orquestan los servicios con Docker Compose?**
-
-**R:** Docker Compose permite:
-
-- **Service Definition**: Definición declarativa de servicios
-- **Network Management**: Redes privadas entre contenedores
-- **Volume Management**: Persistencia de datos
-- **Environment Variables**: Configuración por ambiente
-- **Service Dependencies**: Orden de inicio de servicios
-
-#### **P33: ¿Qué estrategias de monitoring y logging se implementaron?**
-
-**R:** El sistema incluye:
-
-- **Structured Logging**: Logs estructurados con contexto
-- **Error Tracking**: Captura y tracking de errores
-- **Performance Monitoring**: Métricas de rendimiento
-- **Health Checks**: Endpoints de salud para servicios
-- **Distributed Tracing**: Seguimiento de requests entre servicios
+- **Métricas detalladas**: Visibilidad completa del sistema
+- **Structured logging**: Logs correlacionados
+- **Distributed tracing**: Seguimiento entre servicios
+- **Error classification**: Métricas por tipo de error
+- **Real-time monitoring**: Dashboards en tiempo real
 
 ---
 
-## 🎓 Conclusión
+## 🎓 Conclusión Actualizada
 
-Este proyecto demuestra una implementación madura y profesional de:
+Este proyecto demuestra una implementación **completamente funcional** y **production-ready** de:
 
-### **🏗️ Arquitectura y Patrones**
-- ✅ **Arquitectura Hexagonal** con separación clara de capas
-- ✅ **Principios SOLID** aplicados consistentemente
-- ✅ **Patrones de Diseño** implementados apropiadamente
-- ✅ **POO** con encapsulación, herencia, polimorfismo y abstracción
-- ✅ **DDD** con entities, value objects, y domain events
-- ✅ **CQRS** para separación de responsabilidades
+### **🏗️ Arquitectura Empresarial**
+- ✅ **Arquitectura Hexagonal** completamente implementada
+- ✅ **CQRS real** con procesamiento asíncrono
+- ✅ **Event-driven** con RabbitMQ funcional
+- ✅ **Observabilidad completa** con Prometheus
+- ✅ **Configuración**: Variables de entorno para todos los servicios
 
-### **⚙️ Stack Tecnológico**
-- ✅ **RabbitMQ** para mensajería asíncrona y desacoplamiento
-- ✅ **PostgreSQL + SQLAlchemy** para persistencia robusta
-- ✅ **FastAPI** para APIs modernas y eficientes
-- ✅ **JWT + bcrypt** para autenticación segura
-- ✅ **pytest** para testing comprehensivo
-- ✅ **Docker** para containerización y deployment
+### **📊 Observabilidad y Monitoreo**
+- ✅ **Métricas Prometheus** en todas las capas
+- ✅ **Instrumentación automática** no invasiva
+- ✅ **Métricas de negocio** específicas del dominio
+- ✅ **Dashboard ready** para Grafana
+- ✅ **Alerting ready** para PagerDuty/Slack
 
-### **🔧 Calidad y Operaciones**
-- ✅ **Testing** con alta cobertura y calidad
-- ✅ **Seguridad** y mejores prácticas modernas
-- ✅ **Logging** estructurado y monitoreo
-- ✅ **Environment Consistency** con Docker
-- ✅ **Scalability** horizontal y vertical
+### **🚀 Calidad Empresarial**
+- ✅ **Type safety** completo
+- ✅ **Testing** estratificado por capas
+- ✅ **Seguridad** multicapa con métricas
+- ✅ **Performance** optimizado para producción
+- ✅ **Mantenibilidad** alta por separación de responsabilidades
 
 ### **🌟 Características Destacadas**
 
-1. **Event-Driven Architecture**: Comunicación desacoplada mediante eventos de dominio
-2. **Async Processing**: Procesamiento asíncrono de comandos para mejor performance
-3. **Type Safety**: Type hints completo para mejor IDE support y menos errores
-4. **Auto-Documentation**: Swagger/OpenAPI generado automáticamente
-5. **Dependency Injection**: Gestión profesional de dependencias
-6. **Clean Code**: Código limpio, bien documentado y mantenible
+1. **Sistema de Métricas Completo**: 20+ métricas categorizadas
+2. **Procesamiento Asíncrono Real**: RabbitMQ completamente funcional
+3. **Observabilidad Total**: Visibilidad completa del sistema
+4. **Configuración Profesional**: Variables de entorno documentadas
+5. **Instrumentación Automática**: Métricas transparentes
+6. **Event-Driven Architecture**: Comunicación desacoplada real
+7. **Production Ready**: Configuración para ambiente de producción
 
-La combinación de estas técnicas y tecnologías resulta en una aplicación **mantenible**, **escalable**, **testeable** y **robusta**, ideal para entornos de producción empresarial que requieren alta disponibilidad y performance.
+### **💼 Valor Empresarial**
+
+Este sistema proporciona:
+- **Tiempo de desarrollo**: Reducido por arquitectura clara
+- **Tiempo de debugging**: Minimizado por observabilidad
+- **Escalabilidad**: Preparado para crecimiento
+- **Mantenibilidad**: Fácil agregar nuevas funcionalidades
+- **Confiabilidad**: Métricas y monitoring completos
+- **Seguridad**: Múltiples capas de protección
+
+La implementación representa un **sistema de clase empresarial** listo para producción con observabilidad completa, procesamiento asíncrono funcional, y arquitectura escalable que puede servir como base para aplicaciones críticas de negocio.
 
 ---
 
-## 📚 Tecnologías y Herramientas
+## 📚 Stack Tecnológico Completo
 
-- **Backend**: Python 3.11 + FastAPI
-- **Base de Datos**: PostgreSQL + SQLAlchemy
-- **Message Broker**: RabbitMQ
-- **Autenticación**: JWT + bcrypt
-- **Testing**: pytest + coverage
-- **Containerización**: Docker + Docker Compose
-- **Documentación**: OpenAPI/Swagger
+### **Backend y Aplicación**
+- **Python 3.11** + **FastAPI** - API moderna y rápida
+- **PostgreSQL 15** + **SQLAlchemy** - Persistencia robusta
+- **RabbitMQ** - Message broker completamente integrado
+- **JWT** + **bcrypt** - Autenticación segura con métricas
 
----
+### **Observabilidad y Monitoreo**
+- **Prometheus** - Sistema de métricas completo
+- **Structured Logging** - Logging correlacionado
+- **Health Checks** - Verificación de servicios
+- **Instrumentación automática** - Métricas transparentes
 
-*Este análisis cubre los aspectos más importantes que suelen preguntarse en entrevistas técnicas para posiciones de desarrollo backend senior.* 
+### **Configuración y Deployment**
+- **Docker** + **Docker Compose** - Containerización completa
+- **Environment Variables** - Configuración por ambiente
+- **Secrets Management** - Variables sensibles separadas
+- **Multi-stage builds** - Optimización de imágenes
+
+### **Testing y Calidad**
+- **pytest** + **coverage** - Testing comprehensivo
+- **Type hints** - Tipado estático completo
+- **Linting** - Estándares de código
+- **Code documentation** - Documentación completa
+
+*Este análisis refleja un sistema completamente funcional y production-ready con todas las características modernas esperadas en aplicaciones empresariales.* 

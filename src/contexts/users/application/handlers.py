@@ -6,6 +6,13 @@ from src.shared.domain.exceptions import NotFoundError, AlreadyExistsError
 from src.contexts.users.domain.entities import User
 from src.contexts.users.domain.repositories import UserRepository
 from src.contexts.users.domain.services import PasswordService
+from src.shared.infrastructure.metrics import (
+    record_user_operation, 
+    record_command_processing, 
+    record_query_processing,
+    monitor_command,
+    monitor_query
+)
 from src.contexts.users.application.commands import (
     CreateUserCommand, UpdateUserCommand, DeactivateUserCommand, ActivateUserCommand, DeleteUserCommand
 )
@@ -38,37 +45,45 @@ class CreateUserCommandHandler(CommandHandler[CreateUserCommand]):
         self.password_service = password_service
         self.event_bus = event_bus
     
+    @monitor_command("create_user")
     async def handle(self, command: CreateUserCommand) -> UserDto:
         """Handle the create user command."""
-        # Check if user already exists
-        if await self.user_repository.exists_by_email(command.email):
-            raise AlreadyExistsError(f"User with email {command.email} already exists")
-        
-        if await self.user_repository.exists_by_username(command.username):
-            raise AlreadyExistsError(f"User with username {command.username} already exists")
-        
-        # Hash password
-        hashed_password = self.password_service.hash_password(command.password)
-        
-        # Create user
-        user = User.create(
-            email=command.email,
-            username=command.username,
-            first_name=command.first_name,
-            last_name=command.last_name,
-            hashed_password=hashed_password
-        )
-        
-        # Save user
-        saved_user = await self.user_repository.save(user)
-        
-        # Publish domain events
-        events = saved_user.get_domain_events()
-        if events:
-            await self.event_bus.publish(events)
-            saved_user.clear_domain_events()
-        
-        return user_to_dto(saved_user)
+        try:
+            # Check if user already exists
+            if await self.user_repository.exists_by_email(command.email):
+                record_user_operation("create", "error_duplicate_email")
+                raise AlreadyExistsError(f"User with email {command.email} already exists")
+            
+            if await self.user_repository.exists_by_username(command.username):
+                record_user_operation("create", "error_duplicate_username")
+                raise AlreadyExistsError(f"User with username {command.username} already exists")
+            
+            # Hash password
+            hashed_password = self.password_service.hash_password(command.password)
+            
+            # Create user
+            user = User.create(
+                email=command.email,
+                username=command.username,
+                first_name=command.first_name,
+                last_name=command.last_name,
+                hashed_password=hashed_password
+            )
+            
+            # Save user
+            saved_user = await self.user_repository.save(user)
+            
+            # Publish domain events
+            events = saved_user.get_domain_events()
+            if events:
+                await self.event_bus.publish(events)
+                saved_user.clear_domain_events()
+            
+            record_user_operation("create", "success")
+            return user_to_dto(saved_user)
+        except Exception:
+            record_user_operation("create", "error")
+            raise
 
 
 class UpdateUserCommandHandler(CommandHandler[UpdateUserCommand]):
@@ -106,13 +121,20 @@ class GetUserByIdQueryHandler(QueryHandler[GetUserByIdQuery, Optional[UserDto]])
     def __init__(self, user_repository: UserRepository):
         self.user_repository = user_repository
     
+    @monitor_query("get_user_by_id")
     async def handle(self, query: GetUserByIdQuery) -> Optional[UserDto]:
         """Handle the get user by ID query."""
-        user = await self.user_repository.find_by_id(query.user_id)
-        if not user:
-            return None
-        
-        return user_to_dto(user)
+        try:
+            user = await self.user_repository.find_by_id(query.user_id)
+            if not user:
+                record_user_operation("get_by_id", "not_found")
+                return None
+            
+            record_user_operation("get_by_id", "success")
+            return user_to_dto(user)
+        except Exception:
+            record_user_operation("get_by_id", "error")
+            raise
 
 
 class GetUsersQueryHandler(QueryHandler[GetUsersQuery, UserListDto]):

@@ -4,6 +4,7 @@ from typing import List
 from src.shared.application.event_bus import EventBus
 from src.shared.domain.base_entity import DomainEvent
 from src.shared.infrastructure.message_broker import RabbitMQBroker
+from src.shared.infrastructure.metrics import record_message_published
 
 
 logger = logging.getLogger(__name__)
@@ -30,9 +31,14 @@ class RabbitMQEventBus(EventBus):
                 queue_name = self._get_queue_name(event.event_type)
                 await self.broker.publish(queue_name, message)
                 
+                # Record metrics
+                record_message_published(queue_name, "success")
                 logger.info(f"Published event {event.event_type} to queue {queue_name}")
                 
             except Exception as e:
+                # Record failed publish metrics
+                queue_name = self._get_queue_name(event.event_type)
+                record_message_published(queue_name, "error")
                 logger.error(f"Failed to publish event {event.event_type}: {e}")
                 raise
     

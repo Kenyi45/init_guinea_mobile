@@ -4,6 +4,7 @@ from jose import JWTError, jwt
 from src.shared.domain.exceptions import UnauthorizedError
 from src.contexts.users.domain.services import PasswordService
 from src.contexts.users.domain.repositories import UserRepository
+from src.shared.infrastructure.metrics import record_auth_attempt, record_jwt_token_issued
 import os
 
 
@@ -19,26 +20,40 @@ class AuthService:
     
     async def authenticate_user(self, email: str, password: str) -> dict:
         """Authenticate a user with email and password."""
-        user = await self.user_repository.find_by_email(email)
-        if not user:
-            raise UnauthorizedError("Invalid email or password")
-        
-        if not user.is_active:
-            raise UnauthorizedError("User account is inactive")
-        
-        if not self.password_service.verify_password(password, user.hashed_password.hashed_value):
-            raise UnauthorizedError("Invalid email or password")
-        
-        # Create access token
-        access_token = self._create_access_token({"sub": user.id, "email": user.email.value})
-        
-        return {
-            "access_token": access_token,
-            "token_type": "bearer",
-            "user_id": user.id,
-            "email": user.email.value,
-            "expires_at": datetime.utcnow() + timedelta(minutes=self.access_token_expire_minutes)
-        }
+        try:
+            user = await self.user_repository.find_by_email(email)
+            if not user:
+                record_auth_attempt("invalid_credentials")
+                raise UnauthorizedError("Invalid email or password")
+            
+            if not user.is_active:
+                record_auth_attempt("inactive_account")
+                raise UnauthorizedError("User account is inactive")
+            
+            if not self.password_service.verify_password(password, user.hashed_password.hashed_value):
+                record_auth_attempt("invalid_password")
+                raise UnauthorizedError("Invalid email or password")
+            
+            # Create access token
+            access_token = self._create_access_token({"sub": user.id, "email": user.email.value})
+            
+            # Record successful authentication and token issuance
+            record_auth_attempt("success")
+            record_jwt_token_issued()
+            
+            return {
+                "access_token": access_token,
+                "token_type": "bearer",
+                "user_id": user.id,
+                "email": user.email.value,
+                "expires_at": datetime.utcnow() + timedelta(minutes=self.access_token_expire_minutes)
+            }
+        except UnauthorizedError:
+            # Re-raise UnauthorizedError without additional logging
+            raise
+        except Exception:
+            record_auth_attempt("error")
+            raise
     
     def verify_token(self, token: str) -> dict:
         """Verify and decode JWT token."""

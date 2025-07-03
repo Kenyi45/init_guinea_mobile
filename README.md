@@ -55,7 +55,7 @@
 - **⚡ FastAPI** - Framework web moderno y performante
 - **🐘 PostgreSQL 15** - Base de datos relacional robusta
 - **🗃️ SQLAlchemy** - ORM avanzado con connection pooling
-- **🐰 RabbitMQ** - Message broker (infraestructura preparada)
+- **🐰 RabbitMQ** - Message broker para CQRS y eventos
 
 ### **Seguridad**
 - **🔐 JWT (JSON Web Tokens)** - Autenticación stateless
@@ -67,6 +67,11 @@
 - **🧪 pytest** - Framework de testing
 - **🎯 Type Hints** - Tipado estático completo
 - **📝 Logging** - Sistema de logs estructurado
+
+### **Monitoreo & Observabilidad**
+- **📊 Prometheus** - Sistema de métricas y monitoreo
+- **📈 Métricas personalizadas** - Instrumentación de negocio
+- **⏱️ Performance tracking** - Métricas de latencia y throughput
 
 ### **DevOps & Deployment**
 - **🐳 Docker** - Containerización
@@ -187,6 +192,7 @@ DEBUG=true
 |--------|----------|-------------|
 | `GET` | `/` | Información de la API |
 | `GET` | `/health` | Health check |
+| `GET` | `/metrics` | Métricas de Prometheus |
 | `GET` | `/docs` | Documentación Swagger |
 | `GET` | `/redoc` | Documentación ReDoc |
 
@@ -256,13 +262,28 @@ pytest -s
   - ✅ Docker Compose para desarrollo
   - ✅ Logging estructurado
   - ✅ Type hints completo
+  - ✅ Variables de entorno configuradas (example.env)
+
+- **📊 Monitoreo y Observabilidad**
+  - ✅ Métricas con Prometheus implementadas
+  - ✅ Instrumentación completa de HTTP requests
+  - ✅ Métricas de negocio (usuarios, autenticación, comandos)
+  - ✅ Métricas de base de datos y RabbitMQ
+  - ✅ Endpoint /metrics expuesto
+
+- **🔄 CQRS y Mensajería**
+  - ✅ CQRS completamente implementado
+  - ✅ RabbitMQ integrado para procesamiento asíncrono
+  - ✅ EventBus real conectado a RabbitMQ
+  - ✅ Consumers configurados para comandos
+  - ✅ Eventos de dominio procesados asincrónicamente
 
 ### **⚠️ Limitaciones Actuales**
 
-- **🔄 CQRS**: Infraestructura preparada pero usa EventBus dummy
-- **🐰 RabbitMQ**: Configurado pero no completamente integrado
-- **📊 Métricas**: No hay sistema de métricas implementado
-- **🔒 Variables de entorno**: No hay archivo .env de ejemplo
+- **🔍 Cobertura de Tests**: No hay medición automática de cobertura de código
+- **🛡️ Rate Limiting**: No hay límites de velocidad en endpoints
+- **📱 Healthchecks**: Los servicios Docker no tienen healthchecks configurados
+- **🔐 Validación de JWT**: Falta validación de expiración en algunos endpoints
 
 **Respuesta:**
 ```json

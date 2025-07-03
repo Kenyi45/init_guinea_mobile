@@ -1,8 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from src.shared.infrastructure.database import create_tables
 from src.contexts.users.infrastructure.adapters import router as users_router
 from src.contexts.auth.infrastructure.adapters import router as auth_router
+from src.shared.infrastructure.metrics import get_metrics, get_content_type
+from src.shared.infrastructure.metrics_middleware import PrometheusMiddleware
 import logging
 
 
@@ -25,6 +27,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add Prometheus metrics middleware
+app.add_middleware(PrometheusMiddleware)
 
 # Include routers
 app.include_router(users_router, prefix="/api/v1")
@@ -62,4 +67,13 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
-    return {"status": "healthy", "message": "API is running correctly"} 
+    return {"status": "healthy", "message": "API is running correctly"}
+
+
+@app.get("/metrics")
+async def metrics():
+    """Prometheus metrics endpoint."""
+    return Response(
+        content=get_metrics(),
+        media_type=get_content_type()
+    ) 

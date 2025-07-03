@@ -32,3 +32,6 @@ httpx==0.26.0
 # Utils
 python-dotenv==1.0.0
 structlog==23.2.0
+
+# Metrics and Monitoring
+prometheus-client==0.19.0

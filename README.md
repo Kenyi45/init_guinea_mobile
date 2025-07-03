@@ -1,13 +1,13 @@
 # 🚀 Hexagonal Architecture API
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-green.svg)](https://fastapi.tiangolo.com)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-blue.svg)](https://www.postgresql.org)
 [![RabbitMQ](https://img.shields.io/badge/RabbitMQ-3.12+-orange.svg)](https://www.rabbitmq.com)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com)
-[![Tests](https://img.shields.io/badge/Coverage-80%25+-brightgreen.svg)](https://pytest.org)
+[![Tests](https://img.shields.io/badge/Tests-pytest-brightgreen.svg)](https://pytest.org)
 
-> **Aplicación backend moderna** construida con **FastAPI** implementando **Arquitectura Hexagonal**, **CQRS**, y **Bundle-contexts** siguiendo principios **SOLID** y **Domain-Driven Design**.
+> **Aplicación backend moderna** construida con **FastAPI** implementando **Arquitectura Hexagonal** y **Domain-Driven Design** siguiendo principios **SOLID**.
 
 ## 📖 Tabla de Contenidos
 
@@ -17,7 +17,8 @@
 - [📁 Estructura del Proyecto](#-estructura-del-proyecto)
 - [🔗 API Endpoints](#-api-endpoints)
 - [🧪 Testing](#-testing)
-- [🎯 Características Principales](#-características-principales)
+- [🎯 Características Implementadas](#-características-implementadas)
+- [🔜 Funcionalidades Planificadas](#-funcionalidades-planificadas)
 - [💡 Ejemplos de Uso](#-ejemplos-de-uso)
 - [🐳 Servicios Docker](#-servicios-docker)
 - [📚 Documentación](#-documentación)
@@ -32,24 +33,18 @@
 - **🔄 Flexibilidad**: Intercambio sencillo de implementaciones de infraestructura
 - **📦 Separación de Responsabilidades**: Cada capa tiene un propósito específico
 
-### **Patrón CQRS (Command Query Responsibility Segregation)**
-- **📤 Comandos**: Operaciones de escritura procesadas asincrónicamente vía RabbitMQ
-- **📥 Queries**: Operaciones de lectura ejecutadas directamente contra modelos de lectura
-- **⚡ Separación**: Modelos diferentes optimizados para lectura y escritura
-- **🔄 Event-Driven**: Comunicación basada en eventos de dominio
-
-### **Bundle-contexts (Bounded Contexts)**
-- **👥 Users Context**: Gestión completa de usuarios (CRUD, validaciones, eventos)
-- **🔐 Auth Context**: Autenticación y autorización (JWT, passwords, tokens)
-- **🔗 Shared Context**: Infraestructura común y patrones base
-- **📊 Modularidad**: Cada contexto incluye capas Domain, Application e Infrastructure
-
 ### **Domain-Driven Design (DDD)**
 - **🏛️ Entities**: `User` con lógica de negocio e invariantes
 - **💎 Value Objects**: `Email`, `Username`, `FullName`, `HashedPassword`
 - **⚙️ Domain Services**: `PasswordService`, `AuthService`
 - **📢 Domain Events**: `UserCreated`, `UserUpdated`, `UserDeleted`
 - **🗃️ Repository Pattern**: Abstracción de persistencia
+
+### **Bundle-contexts (Bounded Contexts)**
+- **👥 Users Context**: Gestión completa de usuarios (CRUD, validaciones, eventos)
+- **🔐 Auth Context**: Autenticación y autorización (JWT, passwords, tokens)
+- **🔗 Shared Context**: Infraestructura común y patrones base
+- **📊 Modularidad**: Cada contexto incluye capas Domain, Application e Infrastructure
 
 ---
 
@@ -60,7 +55,7 @@
 - **⚡ FastAPI** - Framework web moderno y performante
 - **🐘 PostgreSQL 15** - Base de datos relacional robusta
 - **🗃️ SQLAlchemy** - ORM avanzado con connection pooling
-- **🐰 RabbitMQ** - Message broker para CQRS y eventos
+- **🐰 RabbitMQ** - Message broker (infraestructura preparada)
 
 ### **Seguridad**
 - **🔐 JWT (JSON Web Tokens)** - Autenticación stateless
@@ -70,7 +65,6 @@
 
 ### **Testing & Quality**
 - **🧪 pytest** - Framework de testing
-- **📊 Coverage** - Medición de cobertura de código
 - **🎯 Type Hints** - Tipado estático completo
 - **📝 Logging** - Sistema de logs estructurado
 
@@ -87,7 +81,8 @@
 
 ```bash
 # Clonar el repositorio
-git clone https://github.com/Kenyi45/init_guinea_mobile.git
+git clone <repository-url>
+cd init_project
 
 # Construir y ejecutar todos los servicios
 docker-compose up --build
@@ -107,7 +102,11 @@ pip install -r requirements.txt
 docker-compose up db rabbitmq
 
 # Configurar variables de entorno
-cp .env.example .env
+export DATABASE_URL=postgresql://postgres:password@localhost:5432/hexagonal_db
+export RABBITMQ_URL=amqp://guest:guest@localhost:5672/
+export SECRET_KEY=your-secret-key-here
+export ALGORITHM=HS256
+export ACCESS_TOKEN_EXPIRE_MINUTES=30
 
 # Ejecutar aplicación con hot reload
 uvicorn src.main:app --reload --port 8000
@@ -138,26 +137,28 @@ DEBUG=true
 ## 📁 Estructura del Proyecto
 
 ```
-📦 hexagonal-architecture-api/
+📦 init_project/
 ├── 📂 src/
 │   ├── 📂 shared/                    # 🔗 Código compartido entre contextos
 │   │   ├── 📂 domain/               # 🏛️ Entidades base y value objects
 │   │   ├── 📂 application/          # ⚙️ Patrones CQRS base
 │   │   └── 📂 infrastructure/       # 🔧 Base de datos y Message Broker
-│   └── 📂 contexts/
-│       ├── 📂 users/                # 👥 Contexto de gestión de usuarios
-│       │   ├── 📂 domain/           # 🏛️ Entidades, value objects, repositorios
-│       │   ├── 📂 application/      # ⚙️ Comandos, queries, handlers, DTOs
-│       │   └── 📂 infrastructure/   # 🔧 Modelos SQLAlchemy, repositorios, adaptadores
-│       └── 📂 auth/                 # 🔐 Contexto de autenticación
-│           ├── 📂 domain/           # 🏛️ Servicios de autenticación
-│           ├── 📂 application/      # ⚙️ DTOs y lógica de aplicación
-│           └── 📂 infrastructure/   # 🔧 Adaptadores REST
+│   ├── 📂 contexts/
+│   │   ├── 📂 users/                # 👥 Contexto de gestión de usuarios
+│   │   │   ├── 📂 domain/           # 🏛️ Entidades, value objects, repositorios
+│   │   │   ├── 📂 application/      # ⚙️ Comandos, queries, handlers, DTOs
+│   │   │   └── 📂 infrastructure/   # 🔧 Modelos SQLAlchemy, repositorios, adaptadores
+│   │   └── 📂 auth/                 # 🔐 Contexto de autenticación
+│   │       ├── 📂 domain/           # 🏛️ Servicios de autenticación
+│   │       ├── 📂 application/      # ⚙️ DTOs y lógica de aplicación
+│   │       └── 📂 infrastructure/   # 🔧 Adaptadores REST
+│   └── 📄 main.py                   # 🚀 Aplicación FastAPI
 ├── 📂 tests/                        # 🧪 Tests organizados por contexto
-├── 📂 docker/                       # 🐳 Configuración Docker
 ├── 📄 docker-compose.yml            # 🎼 Orquestación de servicios
+├── 📄 Dockerfile                    # 🐳 Configuración Docker
 ├── 📄 requirements.txt              # 📦 Dependencias Python
 ├── 📄 pytest.ini                    # ⚙️ Configuración de tests
+├── 📄 alembic.ini                   # 🔄 Migraciones de base de datos
 └── 📄 README.md                     # 📖 Este archivo
 ```
 
@@ -189,8 +190,6 @@ DEBUG=true
 | `GET` | `/docs` | Documentación Swagger |
 | `GET` | `/redoc` | Documentación ReDoc |
 
-> **📝 Nota importante**: Actualmente todos los endpoints de usuarios son **públicos** (no requieren autenticación). La implementación de middleware de autenticación JWT está planificada para futuras versiones.
-
 ---
 
 ## 🧪 Testing
@@ -214,41 +213,25 @@ pytest -v tests/contexts/users/domain/test_entities.py
 pytest -s
 ```
 
-### **📊 Cobertura de Testing**
+### **🛠️ Estructura de Testing**
 
-- **🎯 Domain Layer**: >80% cobertura
-- **⚙️ Application Layer**: >70% cobertura  
-- **🔧 Infrastructure Layer**: >60% cobertura
 - **🧪 Unit Tests**: Value objects, entities, services
 - **🔗 Integration Tests**: Handlers, repositories, APIs
-
-### **🛠️ Fixtures y Mocks**
-
-```python
-# tests/conftest.py - Configuración global de testing
-@pytest.fixture
-def db_session():
-    """Database session para testing."""
-    # SQLite en memoria para tests rápidos
-
-@pytest.fixture  
-def sample_user_data():
-    """Datos de usuario para testing."""
-    # Datos válidos para creación de usuarios
-```
+- **📊 Domain Tests**: Lógica de negocio y invariantes
+- **🔐 Authentication Tests**: Flujo completo de autenticación
 
 ---
 
-## 🎯 Características Principales
+## 🎯 Características Implementadas
 
-### **✅ Funcionalidades Implementadas**
+### **✅ Funcionalidades Completadas**
 
 - **👤 Gestión de Usuarios**
-  - ✅ CRUD completo con validaciones de dominio (Create, Read, Update, Delete)
+  - ✅ CRUD completo con validaciones de dominio
   - ✅ Value objects para email, username, nombres
-  - ✅ Eventos de dominio (UserCreated, UserUpdated, UserDeleted)
-  - ✅ Autenticación JWT en endpoints protegidos
+  - ✅ Domain events (UserCreated, UserUpdated, UserDeleted)
   - ✅ Desactivación suave de usuarios (soft delete)
+  - ✅ Validación de duplicados (email, username)
 
 - **🔐 Autenticación Completa**
   - ✅ JWT con expiración configurable
@@ -256,66 +239,30 @@ def sample_user_data():
   - ✅ Login, verificación y renovación de tokens
   - ✅ Middleware de autenticación para endpoints protegidos
 
-- **🏗️ Arquitectura Moderna**
-  - ✅ Arquitectura Hexagonal completa
-  - ✅ Patrón CQRS con RabbitMQ
-  - ✅ Domain-Driven Design
+- **🏗️ Arquitectura Hexagonal**
+  - ✅ Separación clara de capas (Domain, Application, Infrastructure)
+  - ✅ Repository pattern con abstracción
+  - ✅ Domain-Driven Design con entities y value objects
   - ✅ Principios SOLID aplicados
 
-- **🧪 Calidad de Código**
-  - ✅ 80%+ cobertura de tests en dominio
-  - ✅ Type hints completo
-  - ✅ Documentación automática (Swagger/OpenAPI)
-  - ✅ Error handling estructurado
+- **🧪 Testing**
+  - ✅ Tests unitarios para value objects y entities
+  - ✅ Tests de integración para handlers
+  - ✅ Tests de API endpoints
+  - ✅ Fixtures para datos de prueba
 
-- **🚀 DevOps Ready**
+- **🚀 DevOps**
   - ✅ Containerización con Docker
   - ✅ Docker Compose para desarrollo
-  - ✅ Health checks
   - ✅ Logging estructurado
+  - ✅ Type hints completo
 
-### **🔜 Funcionalidades Planificadas**
+### **⚠️ Limitaciones Actuales**
 
-- **👥 User Management**
-  - 🔜 Roles y permisos
-  - 🔜 Verificación de email
-  - 🔜 Reset de contraseñas
-  - 🔜 Perfil de usuario extendido
-
-- **🔐 Authentication**
-  - 🔜 Rate limiting en endpoints de login
-  - 🔜 Logout con blacklist de tokens
-  - 🔜 Autenticación multi-factor (2FA)
-
-- **📊 Observabilidad**
-  - 🔜 Métricas con Prometheus
-  - 🔜 Distributed tracing
-  - 🔜 Alertas automatizadas
-  - 🔜 Dashboard de monitoreo
-
-- **⚡ Performance**
-  - 🔜 Cache con Redis
-  - 🔜 Database read replicas
-  - 🔜 Rate limiting
-  - 🔜 API versioning
-
----
-
-## 💡 Ejemplos de Uso
-
-### **👤 Crear Usuario**
-
-```bash
-curl -X POST "http://localhost:8000/api/v1/users" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "juan.perez@example.com",
-    "username": "jperez",
-    "first_name": "Juan",
-    "last_name": "Pérez", 
-    "password": "MiPassword123!"
-  }'
-```
+- **🔄 CQRS**: Infraestructura preparada pero usa EventBus dummy
+- **🐰 RabbitMQ**: Configurado pero no completamente integrado
+- **📊 Métricas**: No hay sistema de métricas implementado
+- **🔒 Variables de entorno**: No hay archivo .env de ejemplo
 
 **Respuesta:**
 ```json
@@ -323,9 +270,12 @@ curl -X POST "http://localhost:8000/api/v1/users" \
   "id": "uuid-here",
   "email": "juan.perez@example.com",
   "username": "jperez",
+  "first_name": "Juan",
+  "last_name": "Pérez",
   "full_name": "Juan Pérez",
   "is_active": true,
-  "created_at": "2024-01-15T10:30:00Z"
+  "created_at": "2024-01-15T10:30:00Z",
+  "updated_at": "2024-01-15T10:30:00Z"
 }
 ```
 
@@ -400,16 +350,18 @@ curl -X POST "http://localhost:8000/api/v1/auth/refresh" \
 
 ### **🎼 Stack de Servicios**
 
-| Servicio | Puerto | Descripción | Health Check |
-|----------|--------|-------------|--------------|
-| **app** | `8000` | Aplicación FastAPI | `GET /health` |
-| **db** | `5432` | PostgreSQL 15 | Connection test |
-| **rabbitmq** | `5672`, `15672` | Message broker + Management UI | Management API |
+| Servicio | Puerto | Descripción |
+|----------|--------|-------------|
+| **app** | `8000` | Aplicación FastAPI |
+| **db** | `5432` | PostgreSQL 15 |
+| **rabbitmq** | `5672`, `15672` | Message broker + Management UI |
 
 ### **🔧 Configuración Docker Compose**
 
 ```yaml
 # docker-compose.yml
+version: '3.8'
+
 services:
   app:
     build: .
@@ -421,11 +373,8 @@ services:
     depends_on:
       - db
       - rabbitmq
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    volumes:
+      - .:/app
 
   db:
     image: postgres:15-alpine
@@ -433,10 +382,10 @@ services:
       POSTGRES_DB: hexagonal_db
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
@@ -446,8 +395,12 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
-    healthcheck:
-      test: rabbitmq-diagnostics -q ping
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
 ```
 
 ### **📱 Acceso a Interfaces**
@@ -465,17 +418,15 @@ services:
 ### **🔗 Enlaces Útiles**
 
 - **📖 Documentación de la API**: `http://localhost:8000/docs`
-- **🏗️ Arquitectura Detallada**: [ANALISIS_PROYECTO_ENTREVISTA.md](./ANALISIS_PROYECTO_ENTREVISTA.md)
-- **📋 Documentación Técnica**: [PROJECT_DOCUMENTATION.md](./PROJECT_DOCUMENTATION.md)
+- **🏗️ Análisis del Proyecto**: [ANALISIS_PROYECTO_ENTREVISTA.md](./ANALISIS_PROYECTO_ENTREVISTA.md)
 
 ### **🎯 Decisiones Arquitecturales**
 
 1. **🏗️ Arquitectura Hexagonal**: Independencia del dominio y testabilidad
-2. **⚙️ CQRS**: Comandos async vía RabbitMQ, queries síncronas para performance
-3. **📦 Bundle-contexts**: Organización modular para escalabilidad
-4. **🏛️ Domain-Driven Design**: Value objects, entities, y eventos de dominio
-5. **🔌 Dependency Injection**: Acoplamiento débil y testabilidad
-6. **🐳 Containerización**: Consistencia entre entornos y deploy sencillo
+2. **📦 Bundle-contexts**: Organización modular para escalabilidad
+3. **🏛️ Domain-Driven Design**: Value objects, entities, y eventos de dominio
+4. **🔌 Dependency Injection**: Acoplamiento débil y testabilidad
+5. **🐳 Containerización**: Consistencia entre entornos y deploy sencillo
 
 ### **🤝 Contribución**
 
@@ -497,6 +448,32 @@ git push origin feature/nueva-funcionalidad
 ### **📝 Convenciones**
 
 - **🐍 Código**: PEP 8, type hints, docstrings
-- **🧪 Tests**: pytest, coverage >80% en dominio
+- **🧪 Tests**: pytest, cobertura en componentes críticos
 - **📝 Commits**: Conventional commits
 - **📋 Documentación**: Markdown, diagramas cuando sea necesario
+
+---
+
+## 🚀 Tecnologías Utilizadas
+
+**Core:**
+- Python 3.11 + FastAPI
+- PostgreSQL + SQLAlchemy
+- RabbitMQ (preparado)
+- JWT + bcrypt
+- Docker + Docker Compose
+
+**Testing:**
+- pytest + pytest-asyncio
+- pytest-cov
+- httpx (para tests de API)
+
+**Arquitectura:**
+- Hexagonal Architecture
+- Domain-Driven Design
+- Repository Pattern
+- Dependency Injection
+
+---
+
+*Este proyecto demuestra una implementación sólida de arquitectura hexagonal con FastAPI, ideal para aplicaciones empresariales que requieren mantenibilidad y escalabilidad.*

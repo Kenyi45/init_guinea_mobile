@@ -765,32 +765,32 @@ async def save(self, user: User):
 
 ```mermaid
 graph TD
-    A[HTTP Request] --> B[PrometheusMiddleware]
-    B --> C[FastAPI Router]
-    C --> D[Dependency Injection]
-    D --> E[Command/Query Handler]
-    E --> F{CQRS Decision}
+    A["HTTP Request"] --> B["PrometheusMiddleware"]
+    B --> C["FastAPI Router"]
+    C --> D["Dependency Injection"]
+    D --> E["Command/Query Handler"]
+    E --> F{"CQRS Decision"}
     
-    F -->|Command| G[RabbitMQ Queue]
-    G --> H[Message Consumer]
-    H --> I[Command Handler]
-    I --> J[Domain Logic]
-    J --> K[Repository]
-    K --> L[(PostgreSQL)]
+    F -->|Command| G["RabbitMQ Queue"]
+    G --> H["Message Consumer"]
+    H --> I["Command Handler"]
+    I --> J["Domain Logic"]
+    J --> K["Repository"]
+    K --> L[("PostgreSQL")]
     
-    F -->|Query| M[Query Handler]
-    M --> N[Repository]
+    F -->|Query| M["Query Handler"]
+    M --> N["Repository"]
     N --> L
     
-    O[JWT Middleware] --> C
-    P[bcrypt] --> Q[Password Service]
+    O["JWT Middleware"] --> C
+    P["bcrypt"] --> Q["Password Service"]
     Q --> J
     
-    R[Prometheus Metrics] --> S[/metrics endpoint]
-    T[Environment Variables] --> U[Configuration]
+    R["Prometheus Metrics"] --> S["Metrics Endpoint"]
+    T["Environment Variables"] --> U["Configuration"]
     
-    V[All Components] --> W[Metrics Collection]
-    W --> X[Observability Dashboard]
+    V["All Components"] --> W["Metrics Collection"]
+    W --> X["Observability Dashboard"]
 ```
 
 **Ejemplo de flujo completo instrumentado:**

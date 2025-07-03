@@ -427,11 +427,11 @@ class UserCommandConsumer:
             raise
 ```
 
-### **📊 Sistema de Métricas con Prometheus**
+### **📊 Sistema de Métricas con Prometheus + Grafana**
 
 **¿Qué observabilidad proporciona el sistema de métricas?**
 
-Sistema completo de métricas implementado para monitoreo y observabilidad:
+Sistema completo de métricas implementado para monitoreo y observabilidad con dashboard visual:
 
 ```python
 # src/shared/infrastructure/metrics.py
@@ -519,6 +519,21 @@ async def metrics():
         content=get_metrics(),
         media_type=get_content_type()
     )
+```
+
+**Dashboard Grafana automático:**
+```yaml
+# docker-compose.yml
+grafana:
+  image: grafana/grafana:latest
+  ports:
+    - "3000:3000"
+  environment:
+    - GF_SECURITY_ADMIN_USER=admin
+    - GF_SECURITY_ADMIN_PASSWORD=admin123
+  volumes:
+    - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
 ```
 
 ### **🐘 PostgreSQL + SQLAlchemy**
@@ -723,7 +738,15 @@ El sistema proporciona observabilidad completa con métricas categorizadas:
 # Endpoint de métricas Prometheus
 curl http://localhost:8000/metrics
 
-# Ejemplo de output:
+# Dashboard visual Grafana
+# URL: http://localhost:3000
+# Credenciales: admin / admin123
+
+# Scripts para generar tráfico
+./generate_metrics.sh all
+python test_metrics.py
+
+# Ejemplo de output de métricas:
 # HELP http_requests_total Total number of HTTP requests
 # TYPE http_requests_total counter
 http_requests_total{method="GET",endpoint="/health",status_code="200"} 145.0
@@ -854,10 +877,12 @@ graph TD
 **R:** Sistema completo de observabilidad:
 
 - **Prometheus**: Métricas estándar de la industria
+- **Grafana**: Dashboard visual completo con paneles predefinidos
 - **Instrumentación automática**: Middleware transparente
 - **Métricas de negocio**: Operaciones específicas del dominio
 - **Decoradores**: Instrumentación no invasiva
-- **Dashboard ready**: Formato estándar para Grafana
+- **Configuración automática**: Datasources y dashboards se cargan automáticamente
+- **Scripts de prueba**: Generación automática de tráfico para probar métricas
 
 #### **P5: ¿Qué métricas son más importantes para el negocio?**
 
@@ -876,8 +901,10 @@ graph TD
 - **Métricas por error**: Clasificación automática de errores
 - **Tracing**: Seguimiento de requests entre servicios
 - **Alertas**: Basadas en thresholds de métricas
-- **Dashboards**: Visualización en tiempo real
+- **Dashboards**: Visualización en tiempo real en Grafana
 - **Correlación**: Métricas HTTP + DB + RabbitMQ
+- **Scripts de prueba**: Generación automática de tráfico para debugging
+- **Configuración automática**: Dashboards listos para usar sin configuración manual
 
 ### **🐰 RABBITMQ Y PROCESAMIENTO ASÍNCRONO**
 
@@ -1033,9 +1060,11 @@ Este proyecto demuestra una implementación **completamente funcional** y **prod
 
 ### **📊 Observabilidad y Monitoreo**
 - ✅ **Métricas Prometheus** en todas las capas
+- ✅ **Dashboard Grafana** completo con paneles predefinidos
 - ✅ **Instrumentación automática** no invasiva
 - ✅ **Métricas de negocio** específicas del dominio
-- ✅ **Dashboard ready** para Grafana
+- ✅ **Configuración automática** de datasources y dashboards
+- ✅ **Scripts de prueba** para generar tráfico y validar métricas
 - ✅ **Alerting ready** para PagerDuty/Slack
 
 ### **🚀 Calidad Empresarial**
@@ -1048,12 +1077,14 @@ Este proyecto demuestra una implementación **completamente funcional** y **prod
 ### **🌟 Características Destacadas**
 
 1. **Sistema de Métricas Completo**: 20+ métricas categorizadas
-2. **Procesamiento Asíncrono Real**: RabbitMQ completamente funcional
-3. **Observabilidad Total**: Visibilidad completa del sistema
-4. **Configuración Profesional**: Variables de entorno documentadas
-5. **Instrumentación Automática**: Métricas transparentes
-6. **Event-Driven Architecture**: Comunicación desacoplada real
-7. **Production Ready**: Configuración para ambiente de producción
+2. **Dashboard Grafana Automático**: Paneles predefinidos y configuración automática
+3. **Procesamiento Asíncrono Real**: RabbitMQ completamente funcional
+4. **Observabilidad Total**: Visibilidad completa del sistema
+5. **Configuración Profesional**: Variables de entorno documentadas
+6. **Instrumentación Automática**: Métricas transparentes
+7. **Scripts de Prueba**: Generación automática de tráfico para validar métricas
+8. **Event-Driven Architecture**: Comunicación desacoplada real
+9. **Production Ready**: Configuración para ambiente de producción
 
 ### **💼 Valor Empresarial**
 
@@ -1079,9 +1110,11 @@ La implementación representa un **sistema de clase empresarial** listo para pro
 
 ### **Observabilidad y Monitoreo**
 - **Prometheus** - Sistema de métricas completo
+- **Grafana** - Dashboard visual con paneles predefinidos
 - **Structured Logging** - Logging correlacionado
 - **Health Checks** - Verificación de servicios
 - **Instrumentación automática** - Métricas transparentes
+- **Scripts de prueba** - Generación automática de tráfico
 
 ### **Configuración y Deployment**
 - **Docker** + **Docker Compose** - Containerización completa
@@ -1095,4 +1128,4 @@ La implementación representa un **sistema de clase empresarial** listo para pro
 - **Linting** - Estándares de código
 - **Code documentation** - Documentación completa
 
-*Este análisis refleja un sistema completamente funcional y production-ready con todas las características modernas esperadas en aplicaciones empresariales.* 
+*Este análisis refleja un sistema completamente funcional y production-ready con todas las características modernas esperadas en aplicaciones empresariales, incluyendo observabilidad completa con dashboard visual automático.* 

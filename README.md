@@ -70,8 +70,10 @@
 
 ### **Monitoreo & Observabilidad**
 - **📊 Prometheus** - Sistema de métricas y monitoreo
+- **📈 Grafana** - Dashboard visual completo
 - **📈 Métricas personalizadas** - Instrumentación de negocio
 - **⏱️ Performance tracking** - Métricas de latencia y throughput
+- **🎯 Observabilidad completa** - HTTP, DB, RabbitMQ, negocio
 
 ### **DevOps & Deployment**
 - **🐳 Docker** - Containerización
@@ -94,7 +96,9 @@ docker-compose up --build
 
 # API disponible en http://localhost:8000
 # Documentación en http://localhost:8000/docs
-# RabbitMQ Management UI en http://localhost:15672
+# Dashboard Grafana en http://localhost:3000 (admin/admin123)
+# Prometheus en http://localhost:9090
+# RabbitMQ Management UI en http://localhost:15672 (guest/guest)
 ```
 
 ### **💻 Desarrollo Local**
@@ -135,6 +139,10 @@ ACCESS_TOKEN_EXPIRE_MINUTES=30
 
 # Configuración
 DEBUG=true
+
+# Monitoreo (opcional)
+PROMETHEUS_ENABLED=true
+GRAFANA_ENABLED=true
 ```
 
 ---
@@ -164,6 +172,11 @@ DEBUG=true
 ├── 📄 requirements.txt              # 📦 Dependencias Python
 ├── 📄 pytest.ini                    # ⚙️ Configuración de tests
 ├── 📄 alembic.ini                   # 🔄 Migraciones de base de datos
+├── 📂 monitoring/                   # 📊 Configuración de métricas
+│   ├── 📄 prometheus.yml            # ⚙️ Configuración Prometheus
+│   └── 📂 grafana/                  # 📈 Dashboards Grafana
+├── 📄 generate_metrics.sh           # 🚀 Script para generar tráfico
+├── 📄 test_metrics.py               # 🧪 Script Python para métricas
 └── 📄 README.md                     # 📖 Este archivo
 ```
 
@@ -193,6 +206,7 @@ DEBUG=true
 | `GET` | `/` | Información de la API |
 | `GET` | `/health` | Health check |
 | `GET` | `/metrics` | Métricas de Prometheus |
+| `GET` | `/dashboard` | Dashboard de métricas (Grafana) |
 | `GET` | `/docs` | Documentación Swagger |
 | `GET` | `/redoc` | Documentación ReDoc |
 
@@ -266,10 +280,13 @@ pytest -s
 
 - **📊 Monitoreo y Observabilidad**
   - ✅ Métricas con Prometheus implementadas
+  - ✅ Dashboard Grafana completo con paneles predefinidos
   - ✅ Instrumentación completa de HTTP requests
   - ✅ Métricas de negocio (usuarios, autenticación, comandos)
   - ✅ Métricas de base de datos y RabbitMQ
   - ✅ Endpoint /metrics expuesto
+  - ✅ Scripts para generar tráfico y probar métricas
+  - ✅ Configuración automática de datasources y dashboards
 
 - **🔄 CQRS y Mensajería**
   - ✅ CQRS completamente implementado
@@ -347,6 +364,22 @@ curl -X DELETE "http://localhost:8000/api/v1/users/{user-id}" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
+### **📈 Generar Tráfico para Métricas**
+
+```bash
+# Usar script bash para generar tráfico
+./generate_metrics.sh all
+
+# O usar script Python interactivo
+python test_metrics.py
+
+# Ver métricas en tiempo real
+curl http://localhost:8000/metrics
+
+# Acceder al dashboard visual
+# http://localhost:3000 (admin/admin123)
+```
+
 ### **🔄 Renovar Token**
 
 ```bash
@@ -376,6 +409,8 @@ curl -X POST "http://localhost:8000/api/v1/auth/refresh" \
 | **app** | `8000` | Aplicación FastAPI |
 | **db** | `5432` | PostgreSQL 15 |
 | **rabbitmq** | `5672`, `15672` | Message broker + Management UI |
+| **prometheus** | `9090` | Sistema de métricas |
+| **grafana** | `3000` | Dashboard visual |
 
 ### **🔧 Configuración Docker Compose**
 
@@ -429,8 +464,11 @@ volumes:
 - **🌐 API**: http://localhost:8000
 - **📖 Swagger Docs**: http://localhost:8000/docs
 - **📋 ReDoc**: http://localhost:8000/redoc
+- **📊 Dashboard Grafana**: http://localhost:3000 (admin/admin123)
+- **📈 Prometheus**: http://localhost:9090
 - **🐰 RabbitMQ Management**: http://localhost:15672 (guest/guest)
 - **🔍 Health Check**: http://localhost:8000/health
+- **📊 Métricas**: http://localhost:8000/metrics
 
 ---
 
@@ -439,7 +477,10 @@ volumes:
 ### **🔗 Enlaces Útiles**
 
 - **📖 Documentación de la API**: `http://localhost:8000/docs`
+- **📊 Dashboard de Métricas**: `http://localhost:3000` (admin/admin123)
+- **📈 Métricas Prometheus**: `http://localhost:8000/metrics`
 - **🏗️ Análisis del Proyecto**: [ANALISIS_PROYECTO_ENTREVISTA.md](./ANALISIS_PROYECTO_ENTREVISTA.md)
+- **📋 Configuración Dashboard**: [DASHBOARD_SETUP.md](./DASHBOARD_SETUP.md)
 
 ### **🎯 Decisiones Arquitecturales**
 

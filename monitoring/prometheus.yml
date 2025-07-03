@@ -23,8 +23,8 @@ scrape_configs:
   # Scrape metrics from RabbitMQ (if management plugin is enabled)
   - job_name: "rabbitmq"
     static_configs:
-      - targets: ["rabbitmq:15672"]
-    metrics_path: /api/metrics
+      - targets: ["rabbitmq:15692"]
+    metrics_path: /metrics
     scrape_interval: 10s
     scrape_timeout: 5s
 
